@@ -3,5 +3,12 @@
     {
         "tft-espi": "https://github.com/scuba-hacker/TFT_eSPI#PushImageScaled",
         "nav-waypoints": "https://github.com/scuba-hacker/navigation-waypoints"
-    }
+    },
+
+    "export": {
+        "include": [
+          "library.json",
+          "src/*"
+        ]
+      }
 }

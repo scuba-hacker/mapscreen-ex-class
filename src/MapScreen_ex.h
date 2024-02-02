@@ -88,9 +88,9 @@ class MapScreen_ex
 
     class geoRef
     {
-      static const int geoMapsSize=10;  // should be same number as number of maps? - set to arbitrarily larger size.
+      static const int geoMapsSize=10;
       public:
-        int geoMaps[geoMapsSize];       // MBJ REFACTOR to std::array
+        int geoMaps[geoMapsSize];
     };
 
     protected:

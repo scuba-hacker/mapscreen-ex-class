@@ -82,11 +82,11 @@ void MapScreen_ex::initExitWaypoints()
 {
   int currentExitIndex=-1;
   
-  for (int i=0; i<WraysburyWaypoints::getWaypointsCount(); i++)   // MBJ REFACTOR - needs range and enumerate from C++20 as index used.
+  for (int i=0; i<WraysburyWaypoints::getWaypointsCount(); i++)
   {
     if (strncmp(WraysburyWaypoints::waypoints[i]._label, "Z0", 2) == 0)
     {
-      _exitWaypointIndices[++currentExitIndex] = i;          // index i used here
+      _exitWaypointIndices[++currentExitIndex] = i;
       if (currentExitIndex == s_exitWaypointSize - 1)
       {
         _exitWaypointIndices[currentExitIndex] = -1;
@@ -105,9 +105,9 @@ void MapScreen_ex::initCurrentMap(const double diverLatitude, const double diver
   pixel p;
   
   // identify first map that includes diver location within extent
-  for (uint8_t i = getFirstDetailMapIndex(); i<=getAllMapIndex(); i++)   // MBJ REFACTOR - needs range and enumerate from C++20 as index used, with break at all map index
+  for (uint8_t i = getFirstDetailMapIndex(); i<=getAllMapIndex(); i++)
   {
-    p = convertGeoToPixelDouble(diverLatitude, diverLongitude, _maps[i]);         // index i used here
+    p = convertGeoToPixelDouble(diverLatitude, diverLongitude, _maps[i]);
     if (p.x >= 0 && p.x < getTFTWidth() && p.y >=0 && p.y < getTFTHeight())
     {
       scalePixelForZoomedInTile(p,_tileXToDisplay, _tileYToDisplay);
@@ -131,11 +131,11 @@ void MapScreen_ex::setTargetWaypointByLabel(const char* label)
   _targetWaypointIndex = -1;
   const int numberCharsToCompare = 3;
   // find targetWayPoint in the NavigationWaypoints array by first 3 chars
-  for (int i=0; i < WraysburyWaypoints::getWaypointsCount(); i++)        // MBJ REFACTOR - needs range and enumerate from C++20 as index used.
+  for (int i=0; i < WraysburyWaypoints::getWaypointsCount(); i++)
   {
     if (strncmp(WraysburyWaypoints::waypoints[i]._label, label, numberCharsToCompare) == 0)
     {
-      _targetWaypointIndex=i;            // index i used here
+      _targetWaypointIndex=i;
       break;
     }
   }
@@ -216,14 +216,14 @@ const int MapScreen_ex::getClosestJettyIndex(double& shortestDistance)
   shortestDistance = 1e10;
   int closestExitWaypointIndex = 255;
 
-  for (int i=0; i<_exitWaypointCount; i++)       // MBJ REFACTOR - needs range and enumerate from C++20 as index used.
+  for (int i=0; i<_exitWaypointCount; i++)
   {
     double distance = distanceBetween(_lastDiverLatitude, _lastDiverLongitude, WraysburyWaypoints::waypoints[_exitWaypointIndices[i]]._lat, WraysburyWaypoints::waypoints[_exitWaypointIndices[i]]._long);
   
     if (distance < shortestDistance)
     {
       shortestDistance =  distance;
-      closestExitWaypointIndex = i;   // index i used here
+      closestExitWaypointIndex = i;
     }
   }
       
@@ -512,9 +512,9 @@ void MapScreen_ex::writeOverlayTextToCompositeMapSprite()
 
 void MapScreen_ex::drawRegistrationPixelsOnCleanMapSprite(const geo_map& featureMap)
 {
-  for (int i=0; i < getRegistrationMarkLocationsSize(); i++)   // MBJ REFACTOR - needs range and enumerate from C++20 as index used.
+  for (int i=0; i < getRegistrationMarkLocationsSize(); i++)
   {
-    pixel p = getRegistrationMarkLocation(i);         // index i used here
+    pixel p = getRegistrationMarkLocation(i);
 
     int16_t tileX=0,tileY=0;
     p = scalePixelForZoomedInTile(p,tileX,tileY);

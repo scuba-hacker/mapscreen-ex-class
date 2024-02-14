@@ -53,6 +53,7 @@ class MapScreen_ex
         uint16_t headingIndicatorOffsetY;
 
         uint16_t diverHeadingColour;
+        int diverHeadingLinePixelLength;
 
         int featureSpriteColour;
         uint8_t featureSpriteRadius;
@@ -60,8 +61,8 @@ class MapScreen_ex
         uint16_t targetSpriteColour;
         uint16_t lastTargetSpriteColour;
 
-        int directionLineColour;
-        int directionLinePixelLength;
+        int nearestExitLineColour;
+        int nearestExitLinePixelLength;
 
         int targetLineColour;
         int targetLinePixelLength;
@@ -110,7 +111,13 @@ class MapScreen_ex
           _maps = getMaps();
         }
 
+        void initFeatureColours();
+
+        static const uint8_t maxWaypointColours = 10;
+        uint16_t waypointColourLookup[maxWaypointColours];
+
         virtual const geo_map* getNextMapByPixelLocation(MapScreen_ex::pixel loc, const geo_map* thisMap) = 0;
+
 
   public:
     MapScreen_ex(TFT_eSPI& tft,const MapScreenAttr mapAttributes);
@@ -137,12 +144,13 @@ class MapScreen_ex
 
     void drawFeaturesOnSpecifiedMapToScreen(int featureIndex, int16_t zoom=1, int16_t tileX=0, int16_t tileY=0);
     void drawFeaturesOnSpecifiedMapToScreen(const geo_map& featureAreaToShow, int16_t zoom=1, int16_t tileX=0, int16_t tileY=0);
-
     void drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLatitude, const double diverLongitude, const double diverHeading = 0);
-    
     void drawDiverOnCompositedMapSprite(const double latitude, const double longitude, const double heading, const geo_map& featureMap);
-
     void writeOverlayTextToCompositeMapSprite();
+    virtual void drawMapScale(const geo_map& featureMap)
+    {
+      // no scale by default
+    }
 
     TFT_eSprite& getCompositeSprite();
     TFT_eSprite& getCleanMapSprite();
@@ -151,9 +159,10 @@ class MapScreen_ex
     double degreesCourseTo(double lat1, double long1, double lat2, double long2) const;
     double radiansCourseTo(double lat1, double long1, double lat2, double long2) const;
 
-    const int getClosestJettyIndex(double& distance);
-
-    int drawDirectionLineOnCompositeSprite(const double diverLatitude, const double diverLongitude, 
+    int getClosestJettyIndex(double& distance);
+    int getClosestFeatureIndex(double& distance);
+ 
+    int drawDirectionalLineOnCompositeSprite(const double diverLatitude, const double diverLongitude, 
                                                     const geo_map& featureMap, const int waypointIndex, uint16_t colour, int indicatorLength);
 
     void drawHeadingLineOnCompositeMapSprite(const double diverLatitude, const double diverLongitude, 
@@ -162,7 +171,6 @@ class MapScreen_ex
     void drawRegistrationPixelsOnCleanMapSprite(const geo_map& featureMap);
 
     void cycleZoom();
-
     
     bool isAllLakeShown() const { return _showAllLake; }
     void setAllLakeShown(bool showAll);
@@ -191,10 +199,12 @@ class MapScreen_ex
     {
       copyFullScreenSpriteToDisplay(*_compositedScreenSprite);
     }
+    
+    void displayMapLegend();
 
   protected:
     int16_t _zoom;
-    int16_t _priorToZoneZoom;
+    int16_t _prevZoom;
 
     TFT_eSPI& _tft;
 
@@ -209,10 +219,6 @@ class MapScreen_ex
     std::unique_ptr<TFT_eSprite> _targetSprite;
     std::unique_ptr<TFT_eSprite> _lastTargetSprite;
 
-    double _lastDiverLatitude;
-    double _lastDiverLongitude;
-    double _lastDiverHeading;
-
     bool _useDiverHeading;
     
     const geo_map* _maps;
@@ -223,9 +229,6 @@ class MapScreen_ex
 
     virtual void writeMapTitleToSprite(TFT_eSprite& sprite, const geo_map& map) = 0;
     virtual void copyFullScreenSpriteToDisplay(TFT_eSprite& sprite) = 0;
-
-    int _targetWaypointIndex;
-    int _prevWaypointIndex;
    
     int16_t _tileXToDisplay;
     int16_t _tileYToDisplay;
@@ -269,6 +272,23 @@ protected:
 
     bool isPixelOutsideScreenExtent(const MapScreen_ex::pixel loc) const;
     pixel convertGeoToPixelDouble(double latitude, double longitude, const geo_map& mapToPlot) const;
+
+  double _distanceToNearestExit = 0.0;  
+  double _nearestExitBearing = 0.0;
+
+  double _nearestFeatureDistance = 0.0;
+  double _nearestFeatureBearing = 0.0;
+  
+  double _targetBearing = 0.0;
+  double _targetDistance = 0.0;
+
+  double _lastDiverLatitude;
+  double _lastDiverLongitude;
+  double _lastDiverHeading;
+
+  int _targetWaypointIndex;
+  int _prevWaypointIndex;
+  int _nearestFeatureIndex;
 };
 
 #endif

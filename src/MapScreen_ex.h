@@ -23,7 +23,8 @@ class NavigationWaypoint;
  *  DONE - Green Line pointing to nearest exit Cafe or Mid Jetty
  *  TODO - flash Diver Sprite Pink/Yellow when recording a new PIN location.
  *  TODO - Diver sprite flashes blue/green.
- *  TODO - breadcrumb trail
+ *  DONE - breadcrumb trail test
+ *  TODO - breadcrumb record with entire system - upload useraction=2
  */
  
 class MapScreen_ex
@@ -67,6 +68,10 @@ class MapScreen_ex
         int targetLineColour;
         int targetLinePixelLength;
 
+        int breadCrumbColour;
+        int breadCrumbWidth;
+        int breadCrumbDropFixCount;
+
         bool useSpriteForFeatures;
     };
 
@@ -92,6 +97,16 @@ class MapScreen_ex
       static const int geoMapsSize=10;
       public:
         int geoMaps[geoMapsSize];
+    };
+
+    class BreadCrumb
+    {
+      public:
+        double _lat;
+        double _long;
+        double _heading;
+
+      BreadCrumb(const double lat=0.0, const double lng=0.0, const double heading=0.0) : _lat(lat),_long(lng),_heading(heading) {}
     };
 
     protected:
@@ -165,6 +180,9 @@ class MapScreen_ex
     int drawDirectionalLineOnCompositeSprite(const double diverLatitude, const double diverLongitude, 
                                                     const geo_map& featureMap, const int waypointIndex, uint16_t colour, int indicatorLength);
 
+    void drawBreadCrumbTrailOnCompositeMapSprite(const double diverLatitude, const double diverLongitude, 
+                                                            const double heading, const geo_map& featureMap);
+
     void drawHeadingLineOnCompositeMapSprite(const double diverLatitude, const double diverLongitude, 
                                             const double heading, const geo_map& featureMap);
 
@@ -192,6 +210,27 @@ class MapScreen_ex
     bool getDrawAllFeatures() const
     { return _drawAllFeatures; }
 
+    void toggleShowBreadCrumbTrail()
+    {
+      _showBreadCrumbTrail = !_showBreadCrumbTrail;
+
+      if (!_showBreadCrumbTrail)
+        _recordBreadCrumbTrail = false;
+    }
+
+    void toggleRecordBreadCrumbTrail()
+    {
+      _recordBreadCrumbTrail = !_recordBreadCrumbTrail;
+
+      if (_recordBreadCrumbTrail)
+      {
+        _showBreadCrumbTrail=true;
+        _breadCrumbCountDown = _mapAttr.breadCrumbDropFixCount;
+      }
+    }
+
+    void clearBreadCrumbTrail();
+
     void testAnimatingDiverSpriteOnCurrentMap();
     void testDrawingMapsAndFeatures(uint8_t& currentMap, int16_t& zoom);
 
@@ -218,6 +257,8 @@ class MapScreen_ex
     std::unique_ptr<TFT_eSprite> _featureSprite;
     std::unique_ptr<TFT_eSprite> _targetSprite;
     std::unique_ptr<TFT_eSprite> _lastTargetSprite;
+    std::unique_ptr<TFT_eSprite> _breadCrumbSprite;
+    std::unique_ptr<TFT_eSprite> _rotatedBreadCrumbSprite;
 
     bool _useDiverHeading;
     
@@ -234,6 +275,13 @@ class MapScreen_ex
     int16_t _tileYToDisplay;
 
     bool _drawAllFeatures;
+
+    static const int _maxBreadCrumbs=1000;
+    BreadCrumb _breadCrumbTrail[_maxBreadCrumbs];
+    bool _showBreadCrumbTrail = true;
+    bool _recordBreadCrumbTrail = false;
+    int _nextCrumbIndex=0;
+    uint8_t _breadCrumbCountDown = 0;
 
     static const int s_exitWaypointSize=10; 
     std::array<int,s_exitWaypointSize> _exitWaypointIndices;

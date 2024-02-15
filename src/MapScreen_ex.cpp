@@ -22,7 +22,10 @@ MapScreen_ex::MapScreen_ex(TFT_eSPI& tft, const MapScreenAttr mapAttributes) :
                                                         _drawAllFeatures(true),
                                                         _tft(tft),
                                                         _mapAttr(mapAttributes),
-                                                        _exitWaypointCount(-1)
+                                                        _exitWaypointCount(-1),
+                                                        _nextCrumbIndex(0),
+                                                        _showBreadCrumbTrail(true),
+                                                        _recordBreadCrumbTrail(false)
 {
   _currentMap = nullptr;
 
@@ -35,6 +38,8 @@ MapScreen_ex::MapScreen_ex(TFT_eSPI& tft, const MapScreenAttr mapAttributes) :
 
   _targetSprite = std::make_unique<TFT_eSprite>(&_tft);
   _lastTargetSprite = std::make_unique<TFT_eSprite>(&_tft);
+  _breadCrumbSprite = std::make_unique<TFT_eSprite>(&_tft);
+  _rotatedBreadCrumbSprite = std::make_unique<TFT_eSprite>(&_tft);
 }
 
 void MapScreen_ex::initMapScreen()
@@ -123,6 +128,13 @@ void MapScreen_ex::initSprites()
   _lastTargetSprite->setColorDepth(16);
   _lastTargetSprite->createSprite(_mapAttr.featureSpriteRadius*2+1,_mapAttr.featureSpriteRadius*2+1);
   _lastTargetSprite->fillCircle(_mapAttr.featureSpriteRadius,_mapAttr.featureSpriteRadius,_mapAttr.featureSpriteRadius,_mapAttr.lastTargetSpriteColour);
+
+  _breadCrumbSprite->setColorDepth(16);
+  _breadCrumbSprite->createSprite(_mapAttr.breadCrumbWidth, _mapAttr.breadCrumbWidth);
+  _breadCrumbSprite->fillTriangle((_mapAttr.breadCrumbWidth - 1) / 2 + 1,0,6,_mapAttr.breadCrumbWidth,15,_mapAttr.breadCrumbWidth,_mapAttr.breadCrumbColour);
+
+  _rotatedBreadCrumbSprite->setColorDepth(16);
+  _rotatedBreadCrumbSprite->createSprite(_mapAttr.breadCrumbWidth,_mapAttr.breadCrumbWidth);
 }
 
 void MapScreen_ex::initExitWaypoints()
@@ -357,6 +369,8 @@ void MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLat
 
   _cleanMapAndFeaturesSprite->pushToSprite(*_compositedScreenSprite,0,0);
 
+   drawBreadCrumbTrailOnCompositeMapSprite(diverLatitude, diverLongitude, diverHeading, *nextMap);
+
    drawHeadingLineOnCompositeMapSprite(diverLatitude, diverLongitude, diverHeading, *nextMap);
 
   _nearestExitBearing = drawDirectionalLineOnCompositeSprite(diverLatitude, diverLongitude, *nextMap,getClosestJettyIndex(_distanceToNearestExit), _mapAttr.nearestExitLineColour, _mapAttr.nearestExitLinePixelLength);
@@ -382,7 +396,7 @@ void MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLat
 
 bool MapScreen_ex::isPixelOutsideScreenExtent(const MapScreen_ex::pixel loc) const
 {
-  return (loc.x <= 0 || loc.x >= getTFTWidth() || loc.y <=0 || loc.y >= getTFTHeight()); 
+  return (loc.x < 0 || loc.x >= getTFTWidth() || loc.y <0 || loc.y >= getTFTHeight()); 
 }
 
 MapScreen_ex::pixel MapScreen_ex::scalePixelForZoomedInTile(const pixel p, int16_t& tileX, int16_t& tileY) const
@@ -512,6 +526,52 @@ int MapScreen_ex::drawDirectionalLineOnCompositeSprite(const double diverLatitud
   }
 
   return heading;
+}
+
+void MapScreen_ex::clearBreadCrumbTrail()
+{
+  _nextCrumbIndex = 0;
+  _breadCrumbCountDown = _mapAttr.breadCrumbDropFixCount;
+}
+
+void MapScreen_ex::drawBreadCrumbTrailOnCompositeMapSprite(const double diverLatitude, const double diverLongitude, 
+                                                            const double heading, const geo_map& featureMap)
+{
+  if (_recordBreadCrumbTrail)
+  {
+    _breadCrumbCountDown--;
+
+    if (_nextCrumbIndex < _maxBreadCrumbs && _breadCrumbCountDown == 0)
+    {
+      _breadCrumbTrail[_nextCrumbIndex++] = BreadCrumb(diverLatitude, diverLongitude, heading);
+      _breadCrumbCountDown = _mapAttr.breadCrumbDropFixCount;
+    }
+  }
+
+  if (_showBreadCrumbTrail)
+  {
+    int16_t diverTileX=0,diverTileY=0;
+    pixel diverLocation = convertGeoToPixelDouble(diverLatitude, diverLongitude, featureMap);
+    diverLocation = scalePixelForZoomedInTile(diverLocation,diverTileX,diverTileY);
+
+    // draw the entire array of breadcrumbs to composite sprite
+    for (int i=0; i < _nextCrumbIndex; i++)
+    {
+      pixel crumbLocation = convertGeoToPixelDouble(_breadCrumbTrail[i]._lat, _breadCrumbTrail[i]._long, featureMap);
+      if (isPixelOutsideScreenExtent(crumbLocation))
+        continue;
+
+      int16_t crumbTileX=0,crumbTileY=0;
+      crumbLocation = scalePixelForZoomedInTile(crumbLocation,crumbTileX,crumbTileY);
+
+      if (crumbTileX != diverTileX || crumbTileY != diverTileY)
+        continue;
+  
+      _rotatedBreadCrumbSprite->fillSprite(TFT_BLACK);
+      _breadCrumbSprite->pushRotated(*_rotatedBreadCrumbSprite,_breadCrumbTrail[i]._heading,TFT_BLACK); // BLACK is the transparent colour
+      _rotatedBreadCrumbSprite->pushToSprite(*_compositedScreenSprite,crumbLocation.x-5,crumbLocation.y-5,TFT_BLACK); // BLACK is the transparent colour
+    }
+  }
 }
 
 void MapScreen_ex::drawHeadingLineOnCompositeMapSprite(const double diverLatitude, const double diverLongitude, 

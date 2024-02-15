@@ -72,6 +72,10 @@ class MapScreen_ex
         int breadCrumbWidth;
         int breadCrumbDropFixCount;
 
+        int pinBackColour;
+        int pinForeColour;
+        int pinWidth;
+
         bool useSpriteForFeatures;
     };
 
@@ -105,8 +109,9 @@ class MapScreen_ex
         double _lat;
         double _long;
         double _heading;
+        double _depth;
 
-      BreadCrumb(const double lat=0.0, const double lng=0.0, const double heading=0.0) : _lat(lat),_long(lng),_heading(heading) {}
+      BreadCrumb(const double lat=0.0, const double lng=0.0, const double heading=0.0, const double depth=0.0) : _lat(lat),_long(lng),_heading(heading),_depth(depth) {}
     };
 
     protected:
@@ -142,6 +147,13 @@ class MapScreen_ex
     }
     
     virtual void initMapScreen();
+
+    void (*_recordActionCallback)(const bool);
+
+    void registerBreadCrumbRecordActionCallback(void (*recordActionCallback)(const bool))
+    {
+      _recordActionCallback = recordActionCallback;
+    }
     
     virtual int16_t getTFTWidth() const = 0;
     virtual int16_t getTFTHeight() const = 0;
@@ -180,6 +192,10 @@ class MapScreen_ex
     int drawDirectionalLineOnCompositeSprite(const double diverLatitude, const double diverLongitude, 
                                                     const geo_map& featureMap, const int waypointIndex, uint16_t colour, int indicatorLength);
 
+    void placePin(const double lat, const double lng, const double head, const double dep);
+
+    void drawPlacedPins(const double diverLatitude, const double diverLongitude, const geo_map& featureMap);
+
     void drawBreadCrumbTrailOnCompositeMapSprite(const double diverLatitude, const double diverLongitude, 
                                                             const double heading, const geo_map& featureMap);
 
@@ -210,25 +226,9 @@ class MapScreen_ex
     bool getDrawAllFeatures() const
     { return _drawAllFeatures; }
 
-    void toggleShowBreadCrumbTrail()
-    {
-      _showBreadCrumbTrail = !_showBreadCrumbTrail;
-
-      if (!_showBreadCrumbTrail)
-        _recordBreadCrumbTrail = false;
-    }
-
-    void toggleRecordBreadCrumbTrail()
-    {
-      _recordBreadCrumbTrail = !_recordBreadCrumbTrail;
-
-      if (_recordBreadCrumbTrail)
-      {
-        _showBreadCrumbTrail=true;
-        _breadCrumbCountDown = _mapAttr.breadCrumbDropFixCount;
-      }
-    }
-
+    void toggleShowBreadCrumbTrail();
+    void toggleRecordBreadCrumbTrail();
+    void setBreadCrumbTrailRecord(const bool enable);
     void clearBreadCrumbTrail();
 
     void testAnimatingDiverSpriteOnCurrentMap();
@@ -259,6 +259,7 @@ class MapScreen_ex
     std::unique_ptr<TFT_eSprite> _lastTargetSprite;
     std::unique_ptr<TFT_eSprite> _breadCrumbSprite;
     std::unique_ptr<TFT_eSprite> _rotatedBreadCrumbSprite;
+    std::unique_ptr<TFT_eSprite> _pinSprite;
 
     bool _useDiverHeading;
     
@@ -282,6 +283,10 @@ class MapScreen_ex
     bool _recordBreadCrumbTrail = false;
     int _nextCrumbIndex=0;
     uint8_t _breadCrumbCountDown = 0;
+
+    static const int _maxPlacedPins = 50;
+    BreadCrumb _placedPins[_maxPlacedPins];
+    int _placedPinIndex = 0;
 
     static const int s_exitWaypointSize=10; 
     std::array<int,s_exitWaypointSize> _exitWaypointIndices;

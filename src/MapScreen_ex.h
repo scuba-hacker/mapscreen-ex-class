@@ -138,6 +138,10 @@ class MapScreen_ex
 
         virtual const geo_map* getNextMapByPixelLocation(MapScreen_ex::pixel loc, const geo_map* thisMap) = 0;
 
+        virtual bool useBaseMapCache() const
+        {
+            return true;
+        }
 
   public:
     MapScreen_ex(TFT_eSPI& tft,const MapScreenAttr mapAttributes);
@@ -180,7 +184,6 @@ class MapScreen_ex
     }
 
     TFT_eSprite& getCompositeSprite();
-    TFT_eSprite& getCleanMapSprite();
 
     double distanceBetween(double lat1, double long1, double lat2, double long2) const;
     double degreesCourseTo(double lat1, double long1, double lat2, double long2) const;
@@ -202,7 +205,7 @@ class MapScreen_ex
     void drawHeadingLineOnCompositeMapSprite(const double diverLatitude, const double diverLongitude, 
                                             const double heading, const geo_map& featureMap);
 
-    void drawRegistrationPixelsOnCleanMapSprite(const geo_map& featureMap);
+    void drawRegistrationPixelsOnBaseMapSprite(const geo_map& featureMap);
 
     void cycleZoom();
     
@@ -248,8 +251,9 @@ class MapScreen_ex
     TFT_eSPI& _tft;
 
   private:
-    
-    std::unique_ptr<TFT_eSprite> _cleanMapAndFeaturesSprite;
+    std::shared_ptr<TFT_eSprite> _baseMap;
+
+    std::shared_ptr<TFT_eSprite> _baseMapCacheSprite;
     std::shared_ptr<TFT_eSprite> _compositedScreenSprite;
     std::unique_ptr<TFT_eSprite> _diverSprite;
     std::unique_ptr<TFT_eSprite> _diverPlainSprite;
@@ -294,7 +298,7 @@ class MapScreen_ex
     void initSprites();
     void initExitWaypoints();
 
-    void drawFeaturesOnCleanMapSprite(const geo_map& featureMap);
+    void drawFeaturesOnBaseMapSprite(const geo_map& featureMap, TFT_eSprite& sprite);
     
     MapScreen_ex::pixel scalePixelForZoomedInTile(const pixel p, int16_t& tileX, int16_t& tileY) const;
 

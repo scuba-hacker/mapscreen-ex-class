@@ -7,6 +7,7 @@
 
 #include "NavigationWaypoints.h"
 
+
 MapScreen_ex::MapScreen_ex(TFT_eSPI& tft, const MapScreenAttr mapAttributes) : 
                                                         _zoom(1),
                                                         _prevZoom(1),
@@ -26,7 +27,8 @@ MapScreen_ex::MapScreen_ex(TFT_eSPI& tft, const MapScreenAttr mapAttributes) :
                                                         _nextCrumbIndex(0),
                                                         _showBreadCrumbTrail(true),
                                                         _recordBreadCrumbTrail(false),
-                                                        _recordActionCallback(nullptr)
+                                                        _recordActionCallback(nullptr),
+                                                        LOG_HOOK(&Serial)
 {
   _currentMap = nullptr;
 
@@ -329,8 +331,7 @@ void MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLat
   _lastDiverLatitude = diverLatitude;
   _lastDiverLongitude = diverLongitude;
   _lastDiverHeading = diverHeading;
-  
-  
+
   bool forceFirstMapDraw = false;
 
   if (_currentMap == nullptr)
@@ -394,7 +395,7 @@ void MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLat
   _targetBearing = drawDirectionalLineOnCompositeSprite(diverLatitude, diverLongitude, *nextMap,_targetWaypointIndex, _mapAttr.targetLineColour, _mapAttr.targetLinePixelLength);
 
   _targetDistance = distanceBetween(diverLatitude, diverLongitude, WraysburyWaypoints::waypoints[_targetWaypointIndex]._lat, WraysburyWaypoints::waypoints[_targetWaypointIndex]._long);
-  
+
   _nearestFeatureIndex = getClosestFeatureIndex(_nearestFeatureDistance);
 
   _nearestFeatureDistance = distanceBetween(diverLatitude, diverLongitude, WraysburyWaypoints::waypoints[_nearestFeatureIndex]._lat, WraysburyWaypoints::waypoints[_nearestFeatureIndex]._long);

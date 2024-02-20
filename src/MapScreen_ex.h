@@ -8,6 +8,7 @@
 class TFT_eSPI;
 class TFT_eSprite;
 class NavigationWaypoint;
+class Print;
 
 /* Requirements:
  *  
@@ -21,10 +22,9 @@ class NavigationWaypoint;
  *  DONE - Heading indicator in blue
  *  DONE - Direction Line in red to next feature spanning maps and tiles at any zoom
  *  DONE - Green Line pointing to nearest exit Cafe or Mid Jetty
- *  TODO - flash Diver Sprite Pink/Yellow when recording a new PIN location.
- *  TODO - Diver sprite flashes blue/green.
  *  DONE - breadcrumb trail test
- *  TODO - breadcrumb record with entire system - upload useraction=2
+ *  DONE - breadcrumb record with entire system - upload useraction=2
+ *  TODO - flash Diver Sprite Pink/Yellow when recording a new PIN location.
  */
  
 class MapScreen_ex
@@ -149,8 +149,15 @@ class MapScreen_ex
     ~MapScreen_ex()
     {
     }
-    
+  
     virtual void initMapScreen();
+
+    Print* LOG_HOOK;
+
+    void provideLoggingHook(Print& hook)
+    {
+      LOG_HOOK = &hook;
+    }
 
     void (*_recordActionCallback)(const bool);
 

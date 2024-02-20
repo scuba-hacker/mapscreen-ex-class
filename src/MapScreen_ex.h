@@ -138,10 +138,7 @@ class MapScreen_ex
 
         virtual const geo_map* getNextMapByPixelLocation(MapScreen_ex::pixel loc, const geo_map* thisMap) = 0;
 
-        virtual bool useBaseMapCache() const
-        {
-            return true;
-        }
+        virtual bool useBaseMapCache() const = 0;
 
   public:
     MapScreen_ex(TFT_eSPI& tft,const MapScreenAttr mapAttributes);
@@ -185,12 +182,14 @@ class MapScreen_ex
     void drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLatitude, const double diverLongitude, const double diverHeading = 0);
     void drawDiverOnCompositedMapSprite(const double latitude, const double longitude, const double heading, const geo_map& featureMap);
     void writeOverlayTextToCompositeMapSprite();
-    virtual void drawMapScale(const geo_map& featureMap)
+    
+    virtual void drawMapScaleToSprite(TFT_eSprite& sprite, const geo_map& featureMap)
     {
       // no scale by default
     }
 
     TFT_eSprite& getCompositeSprite();
+    TFT_eSprite& getBaseMapSprite();
 
     double distanceBetween(double lat1, double long1, double lat2, double long2) const;
     double degreesCourseTo(double lat1, double long1, double lat2, double long2) const;

@@ -373,7 +373,7 @@ void MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLat
 //        drawRegistrationPixelsOnCleanMapSprite(*nextMap);    // Test Pattern
       }
       
-      drawMapScale(*nextMap);
+      drawMapScaleToSprite(*_baseMap, *nextMap);
     }
     else
     {
@@ -721,6 +721,11 @@ void MapScreen_ex::drawDiverOnCompositedMapSprite(const double latitude, const d
 TFT_eSprite& MapScreen_ex::getCompositeSprite()
 {
   return *_compositedScreenSprite;
+}
+
+TFT_eSprite& MapScreen_ex::getBaseMapSprite()
+{
+  return *_baseMap;
 }
 
 void MapScreen_ex::writeOverlayTextToCompositeMapSprite()

@@ -64,6 +64,7 @@ void MapScreen_ex::initFeatureColours()
   waypointColourLookup[ORANGE_BUOY] = TFT_ORANGE;
   waypointColourLookup[JETTY] = TFT_GREEN;
   waypointColourLookup[UNMARKED] = TFT_GOLD;
+  waypointColourLookup[UNKNOWN] = TFT_BROWN;
 }
 
 void MapScreen_ex::displayMapLegend()
@@ -84,7 +85,7 @@ void MapScreen_ex::displayMapLegend()
 
     int featureRadius = 20;
 
-    for (eWaypointCategory i=BLUE_BUOY; i <= UNMARKED; i = (eWaypointCategory)((int)(i) + 1))
+    for (eWaypointCategory i=BLUE_BUOY; i <= UNKNOWN; i = (eWaypointCategory)((int)(i) + 1))
     {
       int colour = waypointColourLookup[i];
 

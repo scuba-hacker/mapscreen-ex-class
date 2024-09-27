@@ -6,6 +6,7 @@
 #include <memory>
 
 #include "NavigationWaypoints.h"
+#include "Traces.h"
 
 
 MapScreen_ex::MapScreen_ex(TFT_eSPI& tft, const MapScreenAttr mapAttributes) : 
@@ -385,6 +386,8 @@ void MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLat
 
   _baseMapCacheSprite->pushToSprite(*_compositedScreenSprite,0,0);
 
+  drawTracesOnCompositeMapSprite(diverLatitude, diverLongitude, *nextMap);
+
   drawBreadCrumbTrailOnCompositeMapSprite(diverLatitude, diverLongitude, diverHeading, *nextMap);
 
   drawPlacedPins(diverLatitude, diverLongitude, *nextMap);
@@ -609,6 +612,30 @@ void MapScreen_ex::drawPlacedPins(const double diverLatitude, const double diver
       continue;
 
     _pinSprite->pushToSprite(*_compositedScreenSprite,pinLocation.x-_mapAttr.pinWidth/2,pinLocation.y-_mapAttr.pinWidth/2,TFT_BLACK); // BLACK is the transparent colour
+  }
+}
+
+void MapScreen_ex::drawTracesOnCompositeMapSprite(const double diverLatitude, const double diverLongitude, const geo_map& featureMap)
+{
+  int16_t diverTileX=0,diverTileY=0;
+  pixel diverLocation = convertGeoToPixelDouble(diverLatitude, diverLongitude, featureMap);
+  diverLocation = scalePixelForZoomedInTile(diverLocation,diverTileX,diverTileY);
+
+  int n = WraysburyTraces::getAllTraceCount();
+
+  for (int i=0; i < n; i++)
+  {
+    pixel pointLocation = convertGeoToPixelDouble(WraysburyTraces::all_trace[i]._la, WraysburyTraces::all_trace[i]._lo, featureMap);
+    if (isPixelOutsideScreenExtent(pointLocation))
+      continue;
+
+    int16_t pointTileX=0,pointTileY=0;
+    pointLocation = scalePixelForZoomedInTile(pointLocation,pointTileX,pointTileY);
+
+    if (pointTileX != diverTileX || pointTileY != diverTileY)
+      continue;
+
+    _compositedScreenSprite->drawRect(pointLocation.x-1,pointLocation.y-1,_mapAttr.tracePointSize,_mapAttr.tracePointSize,_mapAttr.traceColour);
   }
 }
 

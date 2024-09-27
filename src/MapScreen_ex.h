@@ -77,6 +77,9 @@ class MapScreen_ex
         int pinWidth;
 
         bool useSpriteForFeatures;
+
+        bool traceColour;
+        int tracePointSize;
     };
 
     class geo_map
@@ -112,6 +115,15 @@ class MapScreen_ex
         double _depth;
 
       BreadCrumb(const double lat=0.0, const double lng=0.0, const double heading=0.0, const double depth=0.0) : _lat(lat),_long(lng),_heading(heading),_depth(depth) {}
+    };
+
+    class TracePoint
+    {
+      public:
+        double _lat;
+        double _long;
+
+      TracePoint(double lat = 0.0, double lng=0.0) : _lat(lat),_long(lng) {}
     };
 
     protected:
@@ -204,6 +216,8 @@ class MapScreen_ex
     void placePin(const double lat, const double lng, const double head, const double dep);
 
     void drawPlacedPins(const double diverLatitude, const double diverLongitude, const geo_map& featureMap);
+
+    void drawTracesOnCompositeMapSprite(const double diverLatitude, const double diverLongitude, const geo_map& featureMap);
 
     void drawBreadCrumbTrailOnCompositeMapSprite(const double diverLatitude, const double diverLongitude, 
                                                             const double heading, const geo_map& featureMap);

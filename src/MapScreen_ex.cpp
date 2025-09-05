@@ -8,6 +8,8 @@
 #include "NavigationWaypoints.h"
 #include "Traces.h"
 
+#define USB_SERIAL Serial
+
 
 MapScreen_ex::MapScreen_ex(TFT_eSPI& tft, const MapScreenAttr mapAttributes) : 
                                                         _zoom(1),
@@ -31,6 +33,8 @@ MapScreen_ex::MapScreen_ex(TFT_eSPI& tft, const MapScreenAttr mapAttributes) :
                                                         _recordActionCallback(nullptr),
                                                         LOG_HOOK(&Serial)
 {
+  _debugString[0] = '\0';
+
   _currentMap = nullptr;
 
   _baseMapCacheSprite = std::make_unique<TFT_eSprite>(&_tft);
@@ -66,6 +70,13 @@ void MapScreen_ex::initFeatureColours()
   waypointColourLookup[JETTY] = TFT_GREEN;
   waypointColourLookup[UNMARKED] = TFT_GOLD;
   waypointColourLookup[UNKNOWN] = TFT_BROWN;
+}
+
+
+void MapScreen_ex::initFirstAndEndWaypointsIndices()
+{
+  _firstWaypointIndex = WraysburyWaypoints::getStartIndexWraysbury();  // default for wraysbury
+  _endWaypointsIndex = WraysburyWaypoints::getEndWaypointIndexWraysbury();
 }
 
 void MapScreen_ex::displayMapLegend()
@@ -158,7 +169,8 @@ void MapScreen_ex::initExitWaypoints()
 {
   int currentExitIndex=-1;
   
-  for (int i=0; i<WraysburyWaypoints::getWaypointsCount(); i++)
+  for (int i=_firstWaypointIndex; i<_endWaypointsIndex; i++)
+//  for (int i=0; i<WraysburyWaypoints::getWaypointsCount(); i++)
   {
     if (strncmp(WraysburyWaypoints::waypoints[i]._label, "Z0", 2) == 0)
     {
@@ -181,9 +193,10 @@ void MapScreen_ex::initCurrentMap(const double diverLatitude, const double diver
   pixel p;
   
   // identify first map that includes diver location within extent
-  for (uint8_t i = getFirstDetailMapIndex(); i<=getAllMapIndex(); i++)
+  for (uint8_t i = getFirstDetailMapIndex(); i<getEndDetailMaps(); i++)
   {
     p = convertGeoToPixelDouble(diverLatitude, diverLongitude, _maps[i]);
+
     if (p.x >= 0 && p.x < getTFTWidth() && p.y >=0 && p.y < getTFTHeight())
     {
       scalePixelForZoomedInTile(p,_tileXToDisplay, _tileYToDisplay);
@@ -207,7 +220,7 @@ void MapScreen_ex::setTargetWaypointByLabel(const char* label)
   _targetWaypointIndex = -1;
   const int numberCharsToCompare = 3;
   // find targetWayPoint in the NavigationWaypoints array by first 3 chars
-  for (int i=0; i < WraysburyWaypoints::getWaypointsCount(); i++)
+  for (int i=_firstWaypointIndex; i < _endWaypointsIndex; i++)
   {
     if (strncmp(WraysburyWaypoints::waypoints[i]._label, label, numberCharsToCompare) == 0)
     {
@@ -293,8 +306,9 @@ void MapScreen_ex::cycleZoom()
 int MapScreen_ex::getClosestJettyIndex(double& shortestDistance)
 {
   shortestDistance = 1e10;
-  int closestExitWaypointIndex = 255;
+  int closestExitWaypointIndex = 0;
 
+  //sprintf(_debugString,"getclosestsjetty.."); fillScreen(TFT_BROWN); delay(1000);
   for (int i=0; i<_exitWaypointCount; i++)
   {
     double distance = distanceBetween(_lastDiverLatitude, _lastDiverLongitude, WraysburyWaypoints::waypoints[_exitWaypointIndices[i]]._lat, WraysburyWaypoints::waypoints[_exitWaypointIndices[i]]._long);
@@ -305,16 +319,18 @@ int MapScreen_ex::getClosestJettyIndex(double& shortestDistance)
       closestExitWaypointIndex = i;
     }
   }
+
+  //sprintf(_debugString,"closestjetty index = %i\njetty count=%i\njettywaypoint=%i", closestExitWaypointIndex,_exitWaypointCount,_exitWaypointIndices[closestExitWaypointIndex]); fillScreen(TFT_BROWN); delay(1000);
       
   return _exitWaypointIndices[closestExitWaypointIndex];
 }
 
 int MapScreen_ex::getClosestFeatureIndex(double& shortestDistance)
 {
-  shortestDistance = 1e10;
+  shortestDistance = 1e99;
   int closestFeatureIndex = 255;
 
-  for (int i=0; i < WraysburyWaypoints::getWaypointsCount(); i++)
+  for (int i=_firstWaypointIndex; i < _endWaypointsIndex; i++)
   {
     double distance = distanceBetween(_lastDiverLatitude, _lastDiverLongitude, WraysburyWaypoints::waypoints[i]._lat, WraysburyWaypoints::waypoints[i]._long);
   
@@ -346,15 +362,20 @@ void MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLat
 
   const geo_map* nextMap = getNextMapByPixelLocation(p, _currentMap);
 
+  //sprintf(_debugString,"Done getNextMapByPixelLocation"); fillScreen(TFT_BLACK); delay(1000);
+
   if (nextMap != _currentMap)
   {
       p = convertGeoToPixelDouble(diverLatitude, diverLongitude, *nextMap);
+      //sprintf(_debugString,"convert geo to pixel %i, %i",p.x,p.y); fillScreen(TFT_BLACK); delay(1000);
   }
 
   int16_t prevTileX = _tileXToDisplay;
   int16_t prevTileY = _tileYToDisplay;
   
+  //sprintf(_debugString,"Do scale..."); fillScreen(TFT_BLACK); delay(1000);
   p = scalePixelForZoomedInTile(p,_tileXToDisplay,_tileYToDisplay);
+  //sprintf(_debugString,"scale for zoom %i, %i",p.x,p.y); fillScreen(TFT_GREEN); delay(1000);
 
   if (_prevZoom != _zoom)
   {
@@ -366,50 +387,72 @@ void MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLat
   {
     if (nextMap->mapData)
     {
+      //sprintf(_debugString,"pushImageScaled %i, %i, %i",_zoom,_tileXToDisplay,_tileYToDisplay); fillScreen(TFT_GREEN); delay(2000);
+    
       _baseMap->pushImageScaled(0, 0, getTFTWidth(), getTFTHeight(), _zoom, _tileXToDisplay, _tileYToDisplay, 
                                                   nextMap->mapData, nextMap->swapBytes);
 
       if (_drawAllFeatures)
       {
+        //sprintf(_debugString,"drawFeaturesBase"); fillScreen(TFT_RED); delay(1000);
         drawFeaturesOnBaseMapSprite(*nextMap, *_baseMap);
 //        drawRegistrationPixelsOnCleanMapSprite(*nextMap);    // Test Pattern
       }
       
+        //sprintf(_debugString,"drawMapScaleToSprite"); fillScreen(TFT_BLUE); delay(1000);
       drawMapScaleToSprite(*_baseMap, *nextMap);
     }
     else
     {
+      //sprintf(_debugString,"base fill",_zoom,_tileXToDisplay,_tileYToDisplay); fillScreen(TFT_RED); delay(2000);
       _baseMap->fillSprite(nextMap->backColour);
+      //sprintf(_debugString,"base draw feat"); fillScreen(TFT_BLUE); delay(2000);
       drawFeaturesOnBaseMapSprite(*nextMap, *_baseMap);  // need to revert zoom to 1
     }
   }
 
+  ////sprintf(_debugString,"baseMapCacheSprite push to comp"); fillScreen(TFT_GREEN); delay(1000);
+
   _baseMapCacheSprite->pushToSprite(*_compositedScreenSprite,0,0);
+
+  ////sprintf(_debugString,"drawTracesOnComp"); fillScreen(TFT_BROWN); delay(1000);
 
   drawTracesOnCompositeMapSprite(diverLatitude, diverLongitude, *nextMap);
 
+  ////sprintf(_debugString,"drawBread"); fillScreen(TFT_BLUE); delay(1000);
   drawBreadCrumbTrailOnCompositeMapSprite(diverLatitude, diverLongitude, diverHeading, *nextMap);
 
+  ////sprintf(_debugString,"drawPins"); fillScreen(TFT_GREEN); delay(1000);
   drawPlacedPins(diverLatitude, diverLongitude, *nextMap);
 
+  //sprintf(_debugString,"drawHeading"); fillScreen(TFT_BLUE); delay(1000);
   drawHeadingLineOnCompositeMapSprite(diverLatitude, diverLongitude, diverHeading, *nextMap);
 
   _nearestExitBearing = drawDirectionalLineOnCompositeSprite(diverLatitude, diverLongitude, *nextMap,getClosestJettyIndex(_distanceToNearestExit), _mapAttr.nearestExitLineColour, _mapAttr.nearestExitLinePixelLength);
+  //sprintf(_debugString,"exit bearing: %f\nexit distance: %f", _nearestExitBearing, _distanceToNearestExit); fillScreen(TFT_GREEN); delay(1000);
 
+  //sprintf(_debugString,"drawDirLineT"); fillScreen(TFT_GREEN); delay(1000);
   _targetBearing = drawDirectionalLineOnCompositeSprite(diverLatitude, diverLongitude, *nextMap,_targetWaypointIndex, _mapAttr.targetLineColour, _mapAttr.targetLinePixelLength);
 
+  //sprintf(_debugString,"distBet"); fillScreen(TFT_GREEN); delay(1000);
   _targetDistance = distanceBetween(diverLatitude, diverLongitude, WraysburyWaypoints::waypoints[_targetWaypointIndex]._lat, WraysburyWaypoints::waypoints[_targetWaypointIndex]._long);
 
+  //sprintf(_debugString,"closeFeat"); fillScreen(TFT_GREEN); delay(1000);
   _nearestFeatureIndex = getClosestFeatureIndex(_nearestFeatureDistance);
 
+  //sprintf(_debugString,"distBet2"); fillScreen(TFT_GREEN); delay(1000);
   _nearestFeatureDistance = distanceBetween(diverLatitude, diverLongitude, WraysburyWaypoints::waypoints[_nearestFeatureIndex]._lat, WraysburyWaypoints::waypoints[_nearestFeatureIndex]._long);
 
+  //sprintf(_debugString,"degcourseto"); fillScreen(TFT_GREEN); delay(1000);
   _nearestFeatureBearing = degreesCourseTo(diverLatitude, diverLongitude, WraysburyWaypoints::waypoints[_nearestFeatureIndex]._lat, WraysburyWaypoints::waypoints[_nearestFeatureIndex]._long);
 
+  //sprintf(_debugString,"writetitle"); fillScreen(TFT_GREEN); delay(1000);
   writeMapTitleToSprite(*_compositedScreenSprite, *nextMap);
       
+  //sprintf(_debugString,"diverdraw"); fillScreen(TFT_GREEN); delay(1000);
   drawDiverOnCompositedMapSprite(diverLatitude, diverLongitude, diverHeading, *nextMap);
   
+  //sprintf(_debugString,"copyfulltodisp"); fillScreen(TFT_GREEN); delay(1000);
   copyFullScreenSpriteToDisplay(*_compositedScreenSprite);
 
   _currentMap = nextMap;
@@ -500,21 +543,30 @@ int MapScreen_ex::drawDirectionalLineOnCompositeSprite(const double diverLatitud
 {
   int heading = 0;
 
+  //sprintf(_debugString,"1"); fillScreen(TFT_GREEN); delay(1000);
+
   const NavigationWaypoint& w = WraysburyWaypoints::waypoints[waypointIndex];
 
+  //sprintf(_debugString,"2"); fillScreen(TFT_GREEN); delay(1000);
+
   pixel pDiver = convertGeoToPixelDouble(diverLatitude, diverLongitude, featureMap);
+  //sprintf(_debugString,"3"); fillScreen(TFT_GREEN); delay(1000);
   int16_t diverTileX=0,diverTileY=0;
   pDiver = scalePixelForZoomedInTile(pDiver,diverTileX,diverTileY);
 
+  //sprintf(_debugString,"4"); fillScreen(TFT_GREEN); delay(1000);
   int16_t targetTileX=0,targetTileY=0;
   pixel pTarget = convertGeoToPixelDouble(w._lat, w._long, featureMap);
 
+  //sprintf(_debugString,"5"); fillScreen(TFT_GREEN); delay(1000);
   if (!isPixelOutsideScreenExtent(convertGeoToPixelDouble(w._lat, w._long, featureMap)))
   {
+  //sprintf(_debugString,"6"); fillScreen(TFT_GREEN); delay(1000);
     // use line between diver and target locations
     pTarget.x = pTarget.x * _zoom - getTFTWidth() * diverTileX;
     pTarget.y = pTarget.y * _zoom - getTFTHeight() * diverTileY;
 
+  //sprintf(_debugString,"7"); fillScreen(TFT_GREEN); delay(1000);
     _compositedScreenSprite->drawLine(pDiver.x, pDiver.y, pTarget.x,pTarget.y,colour);
 
     _compositedScreenSprite->drawLine(pDiver.x-2, pDiver.y-2, pTarget.x,pTarget.y,colour);
@@ -522,29 +574,36 @@ int MapScreen_ex::drawDirectionalLineOnCompositeSprite(const double diverLatitud
     _compositedScreenSprite->drawLine(pDiver.x+2, pDiver.y-2, pTarget.x,pTarget.y,colour);
     _compositedScreenSprite->drawLine(pDiver.x+2, pDiver.y+2, pTarget.x,pTarget.y,colour);
 
+  //sprintf(_debugString,"8"); fillScreen(TFT_GREEN); delay(1000);
     if (pTarget.y < pDiver.y)
       heading = (int)(atan((double)(pTarget.x - pDiver.x) / (double)(-(pTarget.y - pDiver.y))) * 180.0 / PI) % 360;
     else if (pTarget.y > pDiver.y)
       heading = (int)(180.0 + atan((double)(pTarget.x - pDiver.x) / (double)(-(pTarget.y - pDiver.y))) * 180.0 / PI);
+  //sprintf(_debugString,"9"); fillScreen(TFT_GREEN); delay(1000);
   }
   else
   {
+  //sprintf(_debugString,"10"); fillScreen(TFT_GREEN); delay(1000);
     heading = degreesCourseTo(diverLatitude,diverLongitude,w._lat,w._long);
 
     // use lat/long to draw outside map area with arbitrary length.
     pixel pHeading;
   
+  //sprintf(_debugString,"11"); fillScreen(TFT_GREEN); delay(1000);
     double rads = heading * PI / 180.0;  
     pHeading.x = pDiver.x + indicatorLength * sin(rads);
     pHeading.y = pDiver.y - indicatorLength * cos(rads);
 
+  //sprintf(_debugString,"12"); fillScreen(TFT_GREEN); delay(1000);
     _compositedScreenSprite->drawLine(pDiver.x, pDiver.y, pHeading.x,pHeading.y,colour);
   
     _compositedScreenSprite->drawLine(pDiver.x-2, pDiver.y-2, pHeading.x,pHeading.y,colour);
     _compositedScreenSprite->drawLine(pDiver.x-2, pDiver.y+2, pHeading.x,pHeading.y,colour);
     _compositedScreenSprite->drawLine(pDiver.x+2, pDiver.y-2, pHeading.x,pHeading.y,colour);
     _compositedScreenSprite->drawLine(pDiver.x+2, pDiver.y+2, pHeading.x,pHeading.y,colour);
+  //sprintf(_debugString,"13"); fillScreen(TFT_GREEN); delay(1000);
   }
+  //sprintf(_debugString,"14"); fillScreen(TFT_GREEN); delay(1000);
 
   return heading;
 }
@@ -790,7 +849,7 @@ void MapScreen_ex::drawRegistrationPixelsOnBaseMapSprite(const geo_map& featureM
 
 void MapScreen_ex::drawFeaturesOnBaseMapSprite(const geo_map& featureMap, TFT_eSprite& sprite)
 {
-  for(int i=0;i<WraysburyWaypoints::getWaypointsCount();i++)
+  for(int i=_firstWaypointIndex;i<_endWaypointsIndex;i++)
   {
     pixel p = convertGeoToPixelDouble(WraysburyWaypoints::waypoints[i]._lat, WraysburyWaypoints::waypoints[i]._long, featureMap);
 

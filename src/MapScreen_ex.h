@@ -30,6 +30,9 @@ class Print;
 class MapScreen_ex
 {  
    public:
+      char _debugString[256];
+      bool _useDebugScreens=false;
+
     class pixel
     {
       public:
@@ -152,6 +155,16 @@ class MapScreen_ex
 
         virtual bool useBaseMapCache() const = 0;
 
+        int _firstWaypointIndex = 0;
+        int _endWaypointsIndex = 0;
+
+        enum locations { e_wraysbury_location, e_vobster_location, e_home_location, e_other_location};
+        locations _location = e_wraysbury_location;
+
+        bool _locationInitialised = false;
+
+        void setLocation(locations loc);
+
   public:
     MapScreen_ex(TFT_eSPI& tft,const MapScreenAttr mapAttributes);
     
@@ -160,6 +173,8 @@ class MapScreen_ex
     }
   
     virtual void initMapScreen();
+
+    virtual void initFirstAndEndWaypointsIndices();
 
     Print* LOG_HOOK;
 
@@ -264,11 +279,24 @@ class MapScreen_ex
     
     void displayMapLegend();
 
+    bool isLocationInitialised() { return _locationInitialised;}
+
+    void setMapLocation(MapScreen_ex::locations loc)
+    {
+      _location = loc;
+    }
+
+    virtual void setLocationLatLong()
+    {
+      _location = e_wraysbury_location;
+    }
+
   protected:
     int16_t _zoom;
     int16_t _prevZoom;
 
     TFT_eSPI& _tft;
+
 
   private:
     std::shared_ptr<TFT_eSprite> _baseMap;
@@ -316,7 +344,6 @@ class MapScreen_ex
     std::array<int,s_exitWaypointSize> _exitWaypointIndices;
  
     void initSprites();
-    void initExitWaypoints();
 
     void drawFeaturesOnBaseMapSprite(const geo_map& featureMap, TFT_eSprite& sprite);
     
@@ -330,6 +357,7 @@ class MapScreen_ex
     void debugScaledPixelForTile(pixel p, pixel pScaled, int16_t tileX,int16_t tileY) const;
 
 protected:
+    void initExitWaypoints();
     struct BoundingBox
     {
       MapScreen_ex::pixel topLeft;

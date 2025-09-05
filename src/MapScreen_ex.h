@@ -158,8 +158,21 @@ class MapScreen_ex
         int _firstWaypointIndex = 0;
         int _endWaypointsIndex = 0;
 
-        enum locations { e_wraysbury_location, e_vobster_location, e_home_location, e_other_location};
-        locations _location = e_wraysbury_location;
+        enum locations { e_wraysbury_location, e_vobster_location, e_home_location, e_other_location, e_uninitialised_location};
+        locations _location = e_uninitialised_location;
+
+        const char* getLocationName()
+        {
+          switch(_location)
+          {
+            case e_wraysbury_location: return "Wraysbury";
+            case e_vobster_location: return "Vobster";
+            case e_home_location: return "Home";
+            case e_other_location: return "Other";
+            case e_uninitialised_location: return "Uninitialised";
+            default: return "Unknown";
+          }
+        }
 
         bool _locationInitialised = false;
 

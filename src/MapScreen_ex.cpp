@@ -26,7 +26,7 @@ MapScreen_ex::MapScreen_ex(TFT_eSPI& tft, const MapScreenAttr mapAttributes) :
                                                         _drawAllFeatures(true),
                                                         _tft(tft),
                                                         _mapAttr(mapAttributes),
-                                                        _exitWaypointCount(-1),
+                                                        _exitWaypointCount(0),
                                                         _nextCrumbIndex(0),
                                                         _showBreadCrumbTrail(true),
                                                         _recordBreadCrumbTrail(false),
@@ -170,8 +170,10 @@ void MapScreen_ex::initExitWaypoints()
   int currentExitIndex=-1;
   
   for (int i=_firstWaypointIndex; i<_endWaypointsIndex; i++)
-//  for (int i=0; i<WraysburyWaypoints::getWaypointsCount(); i++)
   {
+    // starting at the first waypoint for the map, find the first waypoint with code prefix Z0
+    // this is the first exit waypoint index, continue search to find out how many codes with
+    // this prefix are before the end of the waypoints list (for this location).
     if (strncmp(WraysburyWaypoints::waypoints[i]._label, "Z0", 2) == 0)
     {
       _exitWaypointIndices[++currentExitIndex] = i;
@@ -206,12 +208,13 @@ void MapScreen_ex::initCurrentMap(const double diverLatitude, const double diver
   }
 }
 
-void MapScreen_ex::clearMap()
+void MapScreen_ex::clearMap(const bool clearToBlack)
 {
   _currentMap = nullptr;
   _prevZoom = _zoom = 1;
   _tileXToDisplay = _tileXToDisplay = 0;
-  fillScreen(TFT_BLACK);
+  if (clearToBlack)
+    fillScreen(TFT_BLACK);
 }
 
 void MapScreen_ex::setTargetWaypointByLabel(const char* label)
@@ -346,6 +349,12 @@ int MapScreen_ex::getClosestFeatureIndex(double& shortestDistance)
 
 void MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLatitude, const double diverLongitude, const double diverHeading)
 {
+  if (diverLatitude == 0 && diverLongitude == 0 && diverHeading == 0)
+  {
+    USB_SERIAL.println("MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom 1: Bypassing draw as 0,0,0 lat,long,heading - no good location received");
+    return;
+  }
+    
   _lastDiverLatitude = diverLatitude;
   _lastDiverLongitude = diverLongitude;
   _lastDiverHeading = diverHeading;

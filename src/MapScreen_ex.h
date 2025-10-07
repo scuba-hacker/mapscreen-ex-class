@@ -214,7 +214,7 @@ class MapScreen_ex
     }
     
     void initCurrentMap(const double diverLatitude, const double diverLongitude);
-    void clearMap();
+    void clearMap(const bool clearToBlack = true);
     virtual void fillScreen(int colour) = 0;
 
     void drawFeaturesOnSpecifiedMapToScreen(int featureIndex, int16_t zoom=1, int16_t tileX=0, int16_t tileY=0);
@@ -291,8 +291,6 @@ class MapScreen_ex
     }
     
     void displayMapLegend();
-
-    bool isLocationInitialised() { return _locationInitialised;}
 
     void setMapLocation(MapScreen_ex::locations loc)
     {

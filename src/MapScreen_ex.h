@@ -161,9 +161,9 @@ class MapScreen_ex
         enum locations { e_wraysbury_location, e_vobster_location, e_home_location, e_other_location, e_uninitialised_location};
         locations _location = e_uninitialised_location;
 
-        const char* getLocationName()
+        const char* getLocationName(locations loc)
         {
-          switch(_location)
+          switch(loc)
           {
             case e_wraysbury_location: return "Wraysbury";
             case e_vobster_location: return "Vobster";

@@ -8,7 +8,51 @@
 #include "NavigationWaypoints.h"
 #include "Traces.h"
 
+#include <LittleFS.h>
+#include <FS.h>
+
+#include <PNGdec.h>
+PNG png;
+
 #define USB_SERIAL Serial
+
+// PNG callback functions for LittleFS - based on PNGDisplay.inl implementation
+static fs::File pngFile;
+static TFT_eSprite* pngTargetSprite = nullptr;
+
+static void * pngOpenLFS(const char *filename, int32_t *size) {
+  pngFile = LittleFS.open(filename, FILE_READ);
+  if (pngFile) {
+      *size = pngFile.size();
+      return &pngFile;
+  } else {
+      return NULL;
+  }
+}
+
+static void pngClose(void *handle) {
+  if (pngFile) pngFile.close();
+}
+
+static int32_t pngRead(PNGFILE *handle, uint8_t *buffer, int32_t length) {
+  if (!pngFile) return 0;
+  return pngFile.read(buffer, length);
+}
+
+static int32_t pngSeek(PNGFILE *handle, int32_t position) {
+  if (!pngFile) return 0;
+  return pngFile.seek(position);
+}
+
+static int pngDrawToSprite(PNGDRAW *pDraw) {
+  if (!pngTargetSprite) return 0;
+  
+  uint16_t usPixels[pDraw->iWidth];
+  png.getLineAsRGB565(pDraw, usPixels, PNG_RGB565_BIG_ENDIAN, 0xffffffff);
+  pngTargetSprite->pushImage(0, pDraw->y, pDraw->iWidth, 1, usPixels);
+  
+  return 1;
+}
 
 
 MapScreen_ex::MapScreen_ex(TFT_eSPI& tft, const MapScreenAttr mapAttributes) : 
@@ -345,6 +389,66 @@ int MapScreen_ex::getClosestFeatureIndex(double& shortestDistance)
   }
       
   return closestFeatureIndex;
+}
+
+void MapScreen_ex::drawPNG(const char* filename, bool swapBytes)
+{
+  // First check if file exists
+  if (!LittleFS.exists(filename)) {
+      USB_SERIAL.printf("PNG file not found: %s\n", filename);
+      return;
+  }
+  
+  // Check file size
+  fs::File testFile = LittleFS.open(filename, FILE_READ);
+  if (!testFile) {
+      USB_SERIAL.printf("Cannot open PNG file: %s\n", filename);
+      return;
+  }
+  uint32_t fileSize = testFile.size();
+  testFile.close();
+  
+  USB_SERIAL.printf("Opening PNG: %s (size: %d bytes)\n", filename, fileSize);
+  
+  // Set the target sprite for the custom draw callback
+  pngTargetSprite = _compositedScreenSprite.get();
+  
+  int16_t rc = png.open(filename, pngOpenLFS, pngClose, pngRead, pngSeek, pngDrawToSprite);
+
+  if (rc != PNG_SUCCESS) {
+      const char* errorMsg = "Unknown error";
+      switch(rc) {
+          case 1: errorMsg = "Invalid parameter"; break;
+          case 2: errorMsg = "Decode error"; break;
+          case 3: errorMsg = "Memory error"; break;
+          case 4: errorMsg = "No buffer"; break;
+          case 5: errorMsg = "Unsupported feature"; break;
+          case 6: errorMsg = "Invalid file"; break;
+          case 7: errorMsg = "PNG too big (image width > buffer size)"; break;
+          case 8: errorMsg = "Quit early"; break;
+      }
+      USB_SERIAL.printf("png.open() failed: %d - %s\n", rc, errorMsg);
+      USB_SERIAL.printf("Note: PNGdec buffer=%d bytes, supports max %d pixels wide (pitch < %d)\n", 
+                        PNG_MAX_BUFFERED_PIXELS, PNG_MAX_BUFFERED_PIXELS/8, PNG_MAX_BUFFERED_PIXELS/2);
+      pngTargetSprite = nullptr;
+      return;
+  }
+
+  USB_SERIAL.printf("PNG opened: %dx%d, %d bpp\n", png.getWidth(), png.getHeight(), png.getBpp());
+
+  rc = png.decode(NULL, 0);
+
+  if (rc != PNG_SUCCESS) {
+      USB_SERIAL.printf("png.decode() failed: %d\n", rc);
+      png.close();
+      pngTargetSprite = nullptr;
+      return;
+  }
+
+  copyFullScreenSpriteToDisplay(*_compositedScreenSprite);
+
+  png.close();
+  pngTargetSprite = nullptr;
 }
 
 void MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLatitude, const double diverLongitude, const double diverHeading)

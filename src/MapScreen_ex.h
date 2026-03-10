@@ -89,6 +89,7 @@ class MapScreen_ex
     {
       public:
         const uint16_t* mapData;
+        const char* png;
         const char* label;
         const uint16_t backColour;
         const char* backText;
@@ -98,7 +99,12 @@ class MapScreen_ex
         const float mapLongitudeRight;
         const float mapLatitudeBottom;
       
-        geo_map(const uint16_t * md, const char* l, uint16_t bc,const char* bt, bool sm, bool sb, float ll, float lr, float lb) : mapData(md),label(l),backColour(bc),backText(bt),surveyMap(sm),swapBytes(sb),mapLongitudeLeft(ll),mapLongitudeRight(lr),mapLatitudeBottom(lb)
+        geo_map(const uint16_t * md, const char* p, const char* l, uint16_t bc,const char* bt, bool sm, bool sb, float ll, float lr, float lb) : 
+          mapData(md), png(p), label(l), backColour(bc), backText(bt), surveyMap(sm), swapBytes(sb), 
+          mapLongitudeLeft(ll), mapLongitudeRight(lr), mapLatitudeBottom(lb)
+        {}
+
+        geo_map(const uint16_t * md, const char* l, uint16_t bc,const char* bt, bool sm, bool sb, float ll, float lr, float lb) : mapData(md),png(nullptr), label(l),backColour(bc),backText(bt),surveyMap(sm),swapBytes(sb),mapLongitudeLeft(ll),mapLongitudeRight(lr),mapLatitudeBottom(lb)
         {}
     };
 
@@ -238,6 +244,8 @@ class MapScreen_ex
     int getClosestJettyIndex(double& distance);
     int getClosestFeatureIndex(double& distance);
  
+    void drawPNG(const char* filename, bool swapBytes);
+
     int drawDirectionalLineOnCompositeSprite(const double diverLatitude, const double diverLongitude, 
                                                     const geo_map& featureMap, const int waypointIndex, uint16_t colour, int indicatorLength);
 

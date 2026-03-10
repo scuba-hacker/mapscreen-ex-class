@@ -19,6 +19,7 @@ PNG png;
 // PNG callback functions for LittleFS - based on PNGDisplay.inl implementation
 static fs::File pngFile;
 static TFT_eSprite* pngTargetSprite = nullptr;
+static std::vector<uint16_t> pngPixelBuffer;  // Static buffer for PNG decoding (screen-sized, reused for each decode)
 
 static void * pngOpenLFS(const char *filename, int32_t *size) {
   pngFile = LittleFS.open(filename, FILE_READ);
@@ -45,11 +46,16 @@ static int32_t pngSeek(PNGFILE *handle, int32_t position) {
 }
 
 static int pngDrawToSprite(PNGDRAW *pDraw) {
-  if (!pngTargetSprite) return 0;
+  if (pngPixelBuffer.empty()) return 0;
   
   uint16_t usPixels[pDraw->iWidth];
   png.getLineAsRGB565(pDraw, usPixels, PNG_RGB565_BIG_ENDIAN, 0xffffffff);
-  pngTargetSprite->pushImage(0, pDraw->y, pDraw->iWidth, 1, usPixels);
+  
+  // Write line y to pixel buffer
+  size_t offset = (size_t)pDraw->y * pDraw->iWidth;
+  if (offset + pDraw->iWidth <= pngPixelBuffer.size()) {
+    memcpy(&pngPixelBuffer[offset], usPixels, pDraw->iWidth * sizeof(uint16_t));
+  }
   
   return 1;
 }
@@ -166,6 +172,9 @@ void MapScreen_ex::initSprites()
   {
     _baseMapCacheSprite->setColorDepth(16);
     _baseMapCacheSprite->createSprite(getTFTWidth(),getTFTHeight());
+
+    // Allocate PNG pixel buffer only when base cache is enabled (screen-sized, reused for each PNG decode)
+    pngPixelBuffer.resize(getTFTWidth() * getTFTHeight());
   }
 
   _compositedScreenSprite->setColorDepth(16);
@@ -393,6 +402,37 @@ int MapScreen_ex::getClosestFeatureIndex(double& shortestDistance)
 
 void MapScreen_ex::drawPNG(const char* filename, bool swapBytes)
 {
+  // Automatic PNG loading for map rendering
+  if (!filename || !useBaseMapCache() || pngPixelBuffer.empty()) {
+      return;
+  }
+  
+  if (!LittleFS.exists(filename)) {
+      USB_SERIAL.printf("PNG file not found: %s\n", filename);
+      return;
+  }
+  
+  int16_t rc = png.open(filename, pngOpenLFS, pngClose, pngRead, pngSeek, pngDrawToSprite);
+
+  if (rc != PNG_SUCCESS) {
+      USB_SERIAL.printf("png.open() failed: %d\n", rc);
+      return;
+  }
+
+  rc = png.decode(NULL, 0);
+
+  if (rc != PNG_SUCCESS) {
+      USB_SERIAL.printf("png.decode() failed: %d\n", rc);
+      png.close();
+      return;
+  }
+
+  png.close();
+}
+
+void MapScreen_ex::testDrawPNG(const char* filename, bool swapBytes)
+{
+  // Test function for manual PNG drawing with verbose output
   // First check if file exists
   if (!LittleFS.exists(filename)) {
       USB_SERIAL.printf("PNG file not found: %s\n", filename);
@@ -409,9 +449,6 @@ void MapScreen_ex::drawPNG(const char* filename, bool swapBytes)
   testFile.close();
   
   USB_SERIAL.printf("Opening PNG: %s (size: %d bytes)\n", filename, fileSize);
-  
-  // Set the target sprite for the custom draw callback
-  pngTargetSprite = _compositedScreenSprite.get();
   
   int16_t rc = png.open(filename, pngOpenLFS, pngClose, pngRead, pngSeek, pngDrawToSprite);
 
@@ -430,7 +467,6 @@ void MapScreen_ex::drawPNG(const char* filename, bool swapBytes)
       USB_SERIAL.printf("png.open() failed: %d - %s\n", rc, errorMsg);
       USB_SERIAL.printf("Note: PNGdec buffer=%d bytes, supports max %d pixels wide (pitch < %d)\n", 
                         PNG_MAX_BUFFERED_PIXELS, PNG_MAX_BUFFERED_PIXELS/8, PNG_MAX_BUFFERED_PIXELS/2);
-      pngTargetSprite = nullptr;
       return;
   }
 
@@ -441,14 +477,13 @@ void MapScreen_ex::drawPNG(const char* filename, bool swapBytes)
   if (rc != PNG_SUCCESS) {
       USB_SERIAL.printf("png.decode() failed: %d\n", rc);
       png.close();
-      pngTargetSprite = nullptr;
       return;
   }
 
-  copyFullScreenSpriteToDisplay(*_compositedScreenSprite);
-
   png.close();
-  pngTargetSprite = nullptr;
+  
+  // Display the decoded PNG buffer directly
+  copyFullScreenBufferToDisplay(pngPixelBuffer.data());
 }
 
 void MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLatitude, const double diverLongitude, const double diverHeading)
@@ -498,8 +533,32 @@ void MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLat
 
   if (!useBaseMapCache() || nextMap != _currentMap || prevTileX != _tileXToDisplay || prevTileY != _tileYToDisplay || forceFirstMapDraw)
   {
-    if (nextMap->mapData)
+    if (useBaseMapCache() && nextMap->png)
     {
+      // PNG map: decode to buffer then display (when base cache enabled, PNG has priority)
+      drawPNG(nextMap->png, nextMap->swapBytes);
+      
+      if (!pngPixelBuffer.empty())
+      {
+        _baseMap->pushImageScaled(0, 0, getTFTWidth(), getTFTHeight(), _zoom, _tileXToDisplay, _tileYToDisplay, 
+                                                    pngPixelBuffer.data(), nextMap->swapBytes);
+
+        if (_drawAllFeatures)
+        {
+          drawFeaturesOnBaseMapSprite(*nextMap, *_baseMap);
+        }
+        
+        drawMapScaleToSprite(*_baseMap, *nextMap);
+      }
+      else
+      {
+        _baseMap->fillSprite(nextMap->backColour);
+        drawFeaturesOnBaseMapSprite(*nextMap, *_baseMap);
+      }
+    }
+    else if (nextMap->mapData)
+    {
+      // Flash-based map data (fallback when PNG not available or cache disabled)
       //sprintf(_debugString,"pushImageScaled %i, %i, %i",_zoom,_tileXToDisplay,_tileYToDisplay); fillScreen(TFT_GREEN); delay(2000);
     
       _baseMap->pushImageScaled(0, 0, getTFTWidth(), getTFTHeight(), _zoom, _tileXToDisplay, _tileYToDisplay, 
@@ -517,10 +576,11 @@ void MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLat
     }
     else
     {
+      // No map data available - solid color fallback
       //sprintf(_debugString,"base fill",_zoom,_tileXToDisplay,_tileYToDisplay); fillScreen(TFT_RED); delay(2000);
       _baseMap->fillSprite(nextMap->backColour);
       //sprintf(_debugString,"base draw feat"); fillScreen(TFT_BLUE); delay(2000);
-      drawFeaturesOnBaseMapSprite(*nextMap, *_baseMap);  // need to revert zoom to 1
+      drawFeaturesOnBaseMapSprite(*nextMap, *_baseMap);
     }
   }
 

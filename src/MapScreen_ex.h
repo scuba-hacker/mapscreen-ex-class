@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <memory>
 #include <array>
+#include <vector>
 
 class TFT_eSPI;
 class TFT_eSprite;
@@ -245,6 +246,7 @@ class MapScreen_ex
     int getClosestFeatureIndex(double& distance);
  
     void drawPNG(const char* filename, bool swapBytes);
+    void testDrawPNG(const char* filename, bool swapBytes);
 
     int drawDirectionalLineOnCompositeSprite(const double diverLatitude, const double diverLongitude, 
                                                     const geo_map& featureMap, const int waypointIndex, uint16_t colour, int indicatorLength);
@@ -342,7 +344,11 @@ class MapScreen_ex
 
     virtual void writeMapTitleToSprite(TFT_eSprite& sprite, const geo_map& map) = 0;
     virtual void copyFullScreenSpriteToDisplay(TFT_eSprite& sprite) = 0;
-   
+    virtual void copyFullScreenBufferToDisplay(uint16_t* buffer)
+    {
+      // default: do nothing (Tiger doesn't need this)
+    }
+
     int16_t _tileXToDisplay;
     int16_t _tileYToDisplay;
 

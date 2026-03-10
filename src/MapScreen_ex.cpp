@@ -4,6 +4,7 @@
 #include <math.h>
 #include <cstddef>
 #include <memory>
+#include <algorithm>
 
 #include "NavigationWaypoints.h"
 #include "Traces.h"
@@ -296,7 +297,7 @@ void MapScreen_ex::setZoom(const int16_t zoom)
    }
 
   _zoom = zoom;
-//  Serial.printf("switch to zoom %hu normal map\n",zoom);
+  USB_SERIAL.printf("switch to zoom %hu normal map\n",zoom);
 }
     
 void MapScreen_ex::setAllLakeShown(bool showAll)
@@ -310,14 +311,14 @@ void MapScreen_ex::setAllLakeShown(bool showAll)
     _showAllLake = true;
     _zoom = 1;
     _currentMap = _maps+getAllMapIndex();
-//    Serial.println("setAllLakeShown(true): switch to zoom 1 all lake map\n");
+    USB_SERIAL.println("setAllLakeShown(true): switch to zoom 1 all lake map\n");
   }
   else
   {
     _showAllLake = false;
     _zoom = 1;
     _currentMap=nullptr;      // force recalculate of currentmap
-//    Serial.println("setAllLakeShown(false): switch to zoom 1 normal map\n");
+    USB_SERIAL.println("setAllLakeShown(false): switch to zoom 1 normal map\n");
   }
 }
 
@@ -330,32 +331,32 @@ void MapScreen_ex::cycleZoom()
     _showAllLake = false;
     _zoom = 1;
     _currentMap=nullptr;
-//    Serial.println("switch to zoom 1 normal map\n");
+    USB_SERIAL.println("switch to zoom 1 normal map\n");
   }
   else if (!_showAllLake && _zoom == 4)
   {
     _showAllLake = true;
     _zoom = 1;
     _currentMap = _maps+getAllMapIndex();
- //   Serial.println("switch to zoom 4 normal map\n");
+    USB_SERIAL.println("switch to zoom 1 ALL map\n");
   }
   else if (!_showAllLake && _zoom == 3)
   {
     _showAllLake = false;
     _zoom = 4;
-//    Serial.println("switch to zoom 3 normal map\n");
+    USB_SERIAL.println("switch to zoom 4 normal map\n");
   }
   else if (!_showAllLake && _zoom == 2)
   {
     _showAllLake = false;
     _zoom = 3;
-//    Serial.println("switch to zoom 2 normal map\n");
+    USB_SERIAL.println("switch to zoom 3 normal map\n");
   }
   else if (!_showAllLake && _zoom == 1)
   {
     _showAllLake = false;
     _zoom = 2;
-//    Serial.println("switch to zoom 2 normal map\n");
+    USB_SERIAL.println("switch to zoom 2 normal map\n");
   }
 }
 
@@ -416,6 +417,7 @@ void MapScreen_ex::drawPNG(const char* filename, bool swapBytes)
 
   if (rc != PNG_SUCCESS) {
       USB_SERIAL.printf("png.open() failed: %d\n", rc);
+      std::fill(pngPixelBuffer.begin(), pngPixelBuffer.end(), PURPLE);  // Purple on open error
       return;
   }
 
@@ -424,6 +426,7 @@ void MapScreen_ex::drawPNG(const char* filename, bool swapBytes)
   if (rc != PNG_SUCCESS) {
       USB_SERIAL.printf("png.decode() failed: %d\n", rc);
       png.close();
+      std::fill(pngPixelBuffer.begin(), pngPixelBuffer.end(), PINK);  // Pink on decode error
       return;
   }
 
@@ -506,17 +509,26 @@ void MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLat
     forceFirstMapDraw=true;
   }
   
-  pixel p = convertGeoToPixelDouble(diverLatitude, diverLongitude, *_currentMap);
+  // Determine the next map - check all lake first
+  const geo_map* nextMap;
+  if (isAllLakeShown())
+  {
+    // If showing all lake, always use the all map regardless of position
+    nextMap = getMaps() + getAllMapIndex();
+    USB_SERIAL.printf("All Lake mode: nextMap=%s (index=%d) currentMap=%s (index=%d)\n", nextMap->label, (int)(nextMap - getMaps()), _currentMap ? _currentMap->label : "null", (_currentMap ? (int)(_currentMap - getMaps()) : -1));
+  }
+  else
+  {
+    // Calculate pixel location and use location-based logic
+    pixel p = convertGeoToPixelDouble(diverLatitude, diverLongitude, *_currentMap);
+    nextMap = getNextMapByPixelLocation(p, _currentMap);
+    USB_SERIAL.printf("After getNextMapByPixelLocation: nextMap=%s (index=%d) currentMap=%s (index=%d)\n", nextMap->label, (int)(nextMap - getMaps()), _currentMap ? _currentMap->label : "null", (_currentMap ? (int)(_currentMap - getMaps()) : -1));
+  }
 
-  const geo_map* nextMap = getNextMapByPixelLocation(p, _currentMap);
+  // Now calculate pixel in the correct map coordinate system
+  pixel p = convertGeoToPixelDouble(diverLatitude, diverLongitude, *nextMap);
 
   //sprintf(_debugString,"Done getNextMapByPixelLocation"); fillScreen(TFT_BLACK); delay(1000);
-
-  if (nextMap != _currentMap)
-  {
-      p = convertGeoToPixelDouble(diverLatitude, diverLongitude, *nextMap);
-      //sprintf(_debugString,"convert geo to pixel %i, %i",p.x,p.y); fillScreen(TFT_BLACK); delay(1000);
-  }
 
   int16_t prevTileX = _tileXToDisplay;
   int16_t prevTileY = _tileYToDisplay;
@@ -531,10 +543,23 @@ void MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLat
     _prevZoom = _zoom;
   }
 
+  // Force redraw when entering/exiting all lake mode
+  static bool prevShowAllLake = false;
+  if (isAllLakeShown() != prevShowAllLake)
+  {
+    forceFirstMapDraw = true;
+    prevShowAllLake = isAllLakeShown();
+  }
+
   if (!useBaseMapCache() || nextMap != _currentMap || prevTileX != _tileXToDisplay || prevTileY != _tileYToDisplay || forceFirstMapDraw)
   {
+    USB_SERIAL.printf("MAP REDRAW: nextMap=%s (png=%s) currentMap=%s zoom=%d forceFirstMapDraw=%d\n", 
+                      nextMap->label, nextMap->png ? nextMap->png : "none", 
+                      (_currentMap ? _currentMap->label : "null"), _zoom, forceFirstMapDraw);
+    
     if (useBaseMapCache() && nextMap->png)
     {
+      USB_SERIAL.printf("  → Loading PNG: %s\n", nextMap->png);
       // PNG map: decode to buffer then display (when base cache enabled, PNG has priority)
       drawPNG(nextMap->png, nextMap->swapBytes);
       
@@ -1007,7 +1032,7 @@ void MapScreen_ex::drawRegistrationPixelsOnBaseMapSprite(const geo_map& featureM
     if (tileX != _tileXToDisplay || tileY != _tileYToDisplay)
       continue;
   
-  //    Serial.printf("%i,%i      s: %i,%i\n",p.x,p.y,sP.x,sP.y);
+  //    USB_SERIAL.printf("%i,%i      s: %i,%i\n",p.x,p.y,sP.x,sP.y);
     if (p.x >= 0 && p.x < getTFTWidth() && p.y >=0 && p.y < getTFTHeight())   // CHANGE these to take account of tile shown  
     {
       if (_mapAttr.useSpriteForFeatures)
@@ -1029,7 +1054,7 @@ void MapScreen_ex::drawFeaturesOnBaseMapSprite(const geo_map& featureMap, TFT_eS
     int16_t tileX=0,tileY=0;
     p = scalePixelForZoomedInTile(p,tileX,tileY);
 
-//    Serial.printf("%i,%i      s: %i,%i\n",p.x,p.y,sP.x,sP.y);
+//    USB_SERIAL.printf("%i,%i      s: %i,%i\n",p.x,p.y,sP.x,sP.y);
     if (tileX == _tileXToDisplay && tileY == _tileYToDisplay && p.x >= 0 && p.x < getTFTWidth() && p.y >=0 && p.y < getTFTHeight())   // CHANGE these to take account of tile shown  
     {
       if (_mapAttr.useSpriteForFeatures)
@@ -1069,17 +1094,17 @@ MapScreen_ex::pixel MapScreen_ex::convertGeoToPixelDouble(double latitude, doubl
 
 void MapScreen_ex::debugScaledPixelForTile(pixel p, pixel pScaled, int16_t tileX,int16_t tileY) const
 {
-  Serial.printf("dspt x=%i y=%i --> x=%i y=%i  tx=%i ty=%i\n",p.x,p.y,pScaled.x,pScaled.y,tileX,tileY);
+  USB_SERIAL.printf("dspt x=%i y=%i --> x=%i y=%i  tx=%i ty=%i\n",p.x,p.y,pScaled.x,pScaled.y,tileX,tileY);
 }
 
 void MapScreen_ex::debugPixelMapOutput(const MapScreen_ex::pixel loc, const geo_map* thisMap, const geo_map& nextMap) const
 {
-  Serial.printf("dpmo %s %i, %i --> %s\n",thisMap->label,loc.x,loc.y,nextMap.label);
+  USB_SERIAL.printf("dpmo %s %i, %i --> %s\n",thisMap->label,loc.x,loc.y,nextMap.label);
 }
 
 void MapScreen_ex::debugPixelFeatureOutput(const NavigationWaypoint& waypoint, MapScreen_ex::pixel loc, const geo_map& thisMap) const
 {
-  Serial.printf("dpfo x=%i y=%i %s %s \n",loc.x,loc.y,thisMap.label,waypoint._label);
+  USB_SERIAL.printf("dpfo x=%i y=%i %s %s \n",loc.x,loc.y,thisMap.label,waypoint._label);
 }
 
 void MapScreen_ex::drawFeaturesOnSpecifiedMapToScreen(int featureIndex, int16_t zoom, int16_t tileX, int16_t tileY)

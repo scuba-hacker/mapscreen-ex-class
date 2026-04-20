@@ -2,7 +2,9 @@
     "dependencies":
     {
         "TFT_eSPI": "https://github.com/scuba-hacker/TFT_eSPI#PushImageScaled",
-        "nav-waypoints": "https://github.com/scuba-hacker/navigation-waypoints"
+        "nav-waypoints": "https://github.com/scuba-hacker/navigation-waypoints",
+        "TinyGPSPlus": "https://github.com/scuba-hacker/TinyGPSPlus#MercatorFunctions",
+        "PNGDec": "https://github.com/bitbank2/PNGdec"
     },
 
     "export": {

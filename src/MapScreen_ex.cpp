@@ -690,6 +690,7 @@ MapScreen_ex::pixel MapScreen_ex::scalePixelForZoomedInTile(const pixel p, int16
 
 double MapScreen_ex::distanceBetween(double lat1, double long1, double lat2, double long2) const
 {
+  return TinyGPSPlus::distanceBetweenAccurate(lat1,long1,lat2,long2);
   /*
   // returns distance in meters between two positions, both specified
   // as signed decimal-degrees latitude and longitude. Uses great-circle

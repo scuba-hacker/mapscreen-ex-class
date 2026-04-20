@@ -9,6 +9,8 @@
 #include "NavigationWaypoints.h"
 #include "Traces.h"
 
+#include "TinyGPS++.h"
+
 #include <LittleFS.h>
 #include <FS.h>
 
@@ -688,6 +690,7 @@ MapScreen_ex::pixel MapScreen_ex::scalePixelForZoomedInTile(const pixel p, int16
 
 double MapScreen_ex::distanceBetween(double lat1, double long1, double lat2, double long2) const
 {
+  /*
   // returns distance in meters between two positions, both specified
   // as signed decimal-degrees latitude and longitude. Uses great-circle
   // distance computation for hY_t3pothetical sphere of radius 6372795 meters.
@@ -709,6 +712,7 @@ double MapScreen_ex::distanceBetween(double lat1, double long1, double lat2, dou
   double denom = (slat1 * slat2) + (clat1 * clat2 * cdlong);
   delta = atan2(delta, denom);
   return delta * 6372795.0;
+  */
 }
 
 double MapScreen_ex::degreesCourseTo(double lat1, double long1, double lat2, double long2) const

@@ -25,6 +25,10 @@ static TFT_eSprite* pngTargetSprite = nullptr;
 static std::vector<uint16_t> pngPixelBuffer;  // Static buffer for PNG decoding (screen-sized, reused for each decode)
 static std::string lastLoadedPngFilename;      // Tracks which PNG is currently decoded in pngPixelBuffer
 
+// Pre-computed trace pixel cache — geo->pixel is expensive (float math), so bake once per map change
+static std::vector<MapScreen_ex::pixel> tracePixelCache;
+static const MapScreen_ex::geo_map* tracePixelCacheMap = nullptr;
+
 static void * pngOpenLFS(const char *filename, int32_t *size) {
   pngFile = LittleFS.open(filename, FILE_READ);
   if (pngFile) {
@@ -509,7 +513,9 @@ void MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLat
     USB_SERIAL.println("MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom 1: Bypassing draw as 0,0,0 lat,long,heading - no good location received");
     return;
   }
-    
+
+  const uint32_t t0 = micros();
+
   _lastDiverLatitude = diverLatitude;
   _lastDiverLongitude = diverLongitude;
   _lastDiverHeading = diverHeading;
@@ -521,7 +527,7 @@ void MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLat
     initCurrentMap(diverLatitude, diverLongitude);
     forceFirstMapDraw=true;
   }
-  
+
   // Determine the next map - check all lake first
   const geo_map* nextMap;
   if (isAllLakeShown())
@@ -541,14 +547,10 @@ void MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLat
   // Now calculate pixel in the correct map coordinate system
   pixel p = convertGeoToPixelDouble(diverLatitude, diverLongitude, *nextMap);
 
-  //sprintf(_debugString,"Done getNextMapByPixelLocation"); fillScreen(TFT_BLACK); delay(1000);
-
   int16_t prevTileX = _tileXToDisplay;
   int16_t prevTileY = _tileYToDisplay;
-  
-  //sprintf(_debugString,"Do scale..."); fillScreen(TFT_BLACK); delay(1000);
+
   p = scalePixelForZoomedInTile(p,_tileXToDisplay,_tileYToDisplay);
-  //sprintf(_debugString,"scale for zoom %i, %i",p.x,p.y); fillScreen(TFT_GREEN); delay(1000);
 
   if (_prevZoom != _zoom)
   {
@@ -564,29 +566,35 @@ void MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLat
     prevShowAllLake = isAllLakeShown();
   }
 
+  const uint32_t t1 = micros();
+
   if (!useBaseMapCache() || nextMap != _currentMap || prevTileX != _tileXToDisplay || prevTileY != _tileYToDisplay || forceFirstMapDraw)
   {
-    USB_SERIAL.printf("MAP REDRAW: nextMap=%s (png=%s) currentMap=%s zoom=%d forceFirstMapDraw=%d\n", 
-                      nextMap->label, nextMap->png ? nextMap->png : "none", 
+    USB_SERIAL.printf("MAP REDRAW: nextMap=%s (png=%s) currentMap=%s zoom=%d forceFirstMapDraw=%d\n",
+                      nextMap->label, nextMap->png ? nextMap->png : "none",
                       (_currentMap ? _currentMap->label : "null"), _zoom, forceFirstMapDraw);
-    
+
     if (useBaseMapCache() && nextMap->png)
     {
       USB_SERIAL.printf("  → Loading PNG: %s\n", nextMap->png);
-      // PNG map: decode to buffer then display (when base cache enabled, PNG has priority)
+      const uint32_t tPngStart = micros();
       drawPNG(nextMap->png, nextMap->swapBytes);
-      
+      const uint32_t tPngEnd = micros();
+
       if (!pngPixelBuffer.empty())
       {
-        _baseMap->pushImageScaled(0, 0, getTFTWidth(), getTFTHeight(), _zoom, _tileXToDisplay, _tileYToDisplay, 
+        const uint32_t tScaleStart = micros();
+        _baseMap->pushImageScaled(0, 0, getTFTWidth(), getTFTHeight(), _zoom, _tileXToDisplay, _tileYToDisplay,
                                                     pngPixelBuffer.data(), nextMap->swapBytes);
+        const uint32_t tScaleEnd = micros();
 
         if (_drawAllFeatures)
         {
           drawFeaturesOnBaseMapSprite(*nextMap, *_baseMap);
         }
-        
+
         drawMapScaleToSprite(*_baseMap, *nextMap);
+        USB_SERIAL.printf("  TIMING: drawPNG=%luus pushImageScaled=%luus\n", tPngEnd-tPngStart, tScaleEnd-tScaleStart);
       }
       else
       {
@@ -597,74 +605,66 @@ void MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLat
     else if (nextMap->mapData)
     {
       // Flash-based map data (fallback when PNG not available or cache disabled)
-      //sprintf(_debugString,"pushImageScaled %i, %i, %i",_zoom,_tileXToDisplay,_tileYToDisplay); fillScreen(TFT_GREEN); delay(2000);
-    
-      _baseMap->pushImageScaled(0, 0, getTFTWidth(), getTFTHeight(), _zoom, _tileXToDisplay, _tileYToDisplay, 
+      const uint32_t tScaleStart = micros();
+      _baseMap->pushImageScaled(0, 0, getTFTWidth(), getTFTHeight(), _zoom, _tileXToDisplay, _tileYToDisplay,
                                                   nextMap->mapData, nextMap->swapBytes);
+      const uint32_t tScaleEnd = micros();
 
       if (_drawAllFeatures)
       {
-        //sprintf(_debugString,"drawFeaturesBase"); fillScreen(TFT_RED); delay(1000);
         drawFeaturesOnBaseMapSprite(*nextMap, *_baseMap);
-//        drawRegistrationPixelsOnCleanMapSprite(*nextMap);    // Test Pattern
       }
-      
-        //sprintf(_debugString,"drawMapScaleToSprite"); fillScreen(TFT_BLUE); delay(1000);
+
       drawMapScaleToSprite(*_baseMap, *nextMap);
+      USB_SERIAL.printf("  TIMING: pushImageScaled(mapData)=%luus\n", tScaleEnd-tScaleStart);
     }
     else
     {
-      // No map data available - solid color fallback
-      //sprintf(_debugString,"base fill",_zoom,_tileXToDisplay,_tileYToDisplay); fillScreen(TFT_RED); delay(2000);
       _baseMap->fillSprite(nextMap->backColour);
-      //sprintf(_debugString,"base draw feat"); fillScreen(TFT_BLUE); delay(2000);
       drawFeaturesOnBaseMapSprite(*nextMap, *_baseMap);
     }
   }
 
-  ////sprintf(_debugString,"baseMapCacheSprite push to comp"); fillScreen(TFT_GREEN); delay(1000);
+  const uint32_t t2 = micros();
 
   _baseMapCacheSprite->pushToSprite(*_compositedScreenSprite,0,0);
-
-  ////sprintf(_debugString,"drawTracesOnComp"); fillScreen(TFT_BROWN); delay(1000);
+  const uint32_t t3 = micros();
 
   drawTracesOnCompositeMapSprite(diverLatitude, diverLongitude, *nextMap);
+  const uint32_t t4 = micros();
 
-  ////sprintf(_debugString,"drawBread"); fillScreen(TFT_BLUE); delay(1000);
   drawBreadCrumbTrailOnCompositeMapSprite(diverLatitude, diverLongitude, diverHeading, *nextMap);
+  const uint32_t t5 = micros();
 
-  ////sprintf(_debugString,"drawPins"); fillScreen(TFT_GREEN); delay(1000);
   drawPlacedPins(diverLatitude, diverLongitude, *nextMap);
+  const uint32_t t6 = micros();
 
-  //sprintf(_debugString,"drawHeading"); fillScreen(TFT_BLUE); delay(1000);
   drawHeadingLineOnCompositeMapSprite(diverLatitude, diverLongitude, diverHeading, *nextMap);
+  const uint32_t t7 = micros();
 
   _nearestExitBearing = drawDirectionalLineOnCompositeSprite(diverLatitude, diverLongitude, *nextMap,getClosestJettyIndex(_distanceToNearestExit), _mapAttr.nearestExitLineColour, _mapAttr.nearestExitLinePixelLength);
-  //sprintf(_debugString,"exit bearing: %f\nexit distance: %f", _nearestExitBearing, _distanceToNearestExit); fillScreen(TFT_GREEN); delay(1000);
+  const uint32_t t8 = micros();
 
-  //sprintf(_debugString,"drawDirLineT"); fillScreen(TFT_GREEN); delay(1000);
   _targetBearing = drawDirectionalLineOnCompositeSprite(diverLatitude, diverLongitude, *nextMap,_targetWaypointIndex, _mapAttr.targetLineColour, _mapAttr.targetLinePixelLength);
+  const uint32_t t9 = micros();
 
-  //sprintf(_debugString,"distBet"); fillScreen(TFT_GREEN); delay(1000);
   _targetDistance = distanceBetween(diverLatitude, diverLongitude, WraysburyWaypoints::waypoints[_targetWaypointIndex]._lat, WraysburyWaypoints::waypoints[_targetWaypointIndex]._long);
-
-  //sprintf(_debugString,"closeFeat"); fillScreen(TFT_GREEN); delay(1000);
   _nearestFeatureIndex = getClosestFeatureIndex(_nearestFeatureDistance);
-
-  //sprintf(_debugString,"distBet2"); fillScreen(TFT_GREEN); delay(1000);
   _nearestFeatureDistance = distanceBetween(diverLatitude, diverLongitude, WraysburyWaypoints::waypoints[_nearestFeatureIndex]._lat, WraysburyWaypoints::waypoints[_nearestFeatureIndex]._long);
-
-  //sprintf(_debugString,"degcourseto"); fillScreen(TFT_GREEN); delay(1000);
   _nearestFeatureBearing = degreesCourseTo(diverLatitude, diverLongitude, WraysburyWaypoints::waypoints[_nearestFeatureIndex]._lat, WraysburyWaypoints::waypoints[_nearestFeatureIndex]._long);
+  const uint32_t t10 = micros();
 
-  //sprintf(_debugString,"writetitle"); fillScreen(TFT_GREEN); delay(1000);
   writeMapTitleToSprite(*_compositedScreenSprite, *nextMap);
-      
-  //sprintf(_debugString,"diverdraw"); fillScreen(TFT_GREEN); delay(1000);
+  const uint32_t t11 = micros();
+
   drawDiverOnCompositedMapSprite(diverLatitude, diverLongitude, diverHeading, *nextMap);
-  
-  //sprintf(_debugString,"copyfulltodisp"); fillScreen(TFT_GREEN); delay(1000);
+  const uint32_t t12 = micros();
+
   copyFullScreenSpriteToDisplay(*_compositedScreenSprite);
+  const uint32_t t13 = micros();
+
+  USB_SERIAL.printf("DRAW TIMING (us): setup=%lu baseMap=%lu pushToComp=%lu traces=%lu bread=%lu pins=%lu heading=%lu exitLine=%lu targetLine=%lu geo=%lu title=%lu diver=%lu display=%lu TOTAL=%lu\n",
+    t1-t0, t2-t1, t3-t2, t4-t3, t5-t4, t6-t5, t7-t6, t8-t7, t9-t8, t10-t9, t11-t10, t12-t11, t13-t12, t13-t0);
 
   _currentMap = nextMap;
 }
@@ -890,15 +890,25 @@ void MapScreen_ex::drawPlacedPins(const double diverLatitude, const double diver
 
 void MapScreen_ex::drawTracesOnCompositeMapSprite(const double diverLatitude, const double diverLongitude, const geo_map& featureMap)
 {
+  // Rebuild pixel cache when map changes — convertGeoToPixelDouble is expensive at 1381 points/frame
+  if (&featureMap != tracePixelCacheMap)
+  {
+    const int n = WraysburyTraces::getAllTraceCount();
+    tracePixelCache.resize(n);
+    for (int i = 0; i < n; i++)
+      tracePixelCache[i] = convertGeoToPixelDouble(WraysburyTraces::all_trace[i]._la, WraysburyTraces::all_trace[i]._lo, featureMap);
+    tracePixelCacheMap = &featureMap;
+    USB_SERIAL.printf("drawTracesOnCompositeMapSprite: rebuilt pixel cache for map '%s' (%d points)\n", featureMap.label, n);
+  }
+
   int16_t diverTileX=0,diverTileY=0;
   pixel diverLocation = convertGeoToPixelDouble(diverLatitude, diverLongitude, featureMap);
   diverLocation = scalePixelForZoomedInTile(diverLocation,diverTileX,diverTileY);
 
-  int n = WraysburyTraces::getAllTraceCount();
-
-  for (int i=0; i < n; i++)
+  const int n = WraysburyTraces::getAllTraceCount();
+  for (int i = 0; i < n; i++)
   {
-    pixel pointLocation = convertGeoToPixelDouble(WraysburyTraces::all_trace[i]._la, WraysburyTraces::all_trace[i]._lo, featureMap);
+    pixel pointLocation = tracePixelCache[i];
     if (isPixelOutsideScreenExtent(pointLocation))
       continue;
 

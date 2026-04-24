@@ -273,7 +273,7 @@ void MapScreen_ex::clearMap(const bool clearToBlack)
 {
   _currentMap = nullptr;
   _prevZoom = _zoom = 1;
-  _tileXToDisplay = _tileXToDisplay = 0;
+  _tileXToDisplay = _tileYToDisplay = 0;
   if (clearToBlack)
     fillScreen(TFT_BLACK);
 }

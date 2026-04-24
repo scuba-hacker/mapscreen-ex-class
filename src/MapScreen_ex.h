@@ -242,8 +242,8 @@ class MapScreen_ex
     double degreesCourseTo(double lat1, double long1, double lat2, double long2) const;
     double radiansCourseTo(double lat1, double long1, double lat2, double long2) const;
 
-    int getClosestJettyIndex(double& distance);
-    int getClosestFeatureIndex(double& distance);
+    int getClosestJettyIndex(double& distance, bool useFastApprox = false);
+    int getClosestFeatureIndex(double& distance, bool useFastApprox = false);
  
     void drawPNG(const char* filename, bool swapBytes);
     void testDrawPNG(const char* filename, bool swapBytes);

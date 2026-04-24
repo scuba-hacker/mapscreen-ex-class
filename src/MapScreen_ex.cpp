@@ -367,44 +367,74 @@ void MapScreen_ex::cycleZoom()
   }
 }
 
-int MapScreen_ex::getClosestJettyIndex(double& shortestDistance)
+int MapScreen_ex::getClosestJettyIndex(double& shortestDistance, bool useFastApprox)
 {
-  shortestDistance = 1e10;
   int closestExitWaypointIndex = 0;
 
-  //sprintf(_debugString,"getclosestsjetty.."); fillScreen(TFT_BROWN); delay(1000);
-  for (int i=0; i<_exitWaypointCount; i++)
+  if (useFastApprox)
   {
-    double distance = distanceBetween(_lastDiverLatitude, _lastDiverLongitude, WraysburyWaypoints::waypoints[_exitWaypointIndices[i]]._lat, WraysburyWaypoints::waypoints[_exitWaypointIndices[i]]._long);
-  
-    if (distance < shortestDistance)
+    // Equirectangular squared distance — one cos() then pure arithmetic per waypoint.
+    // Ordering identical to Haversine at dive-site scale; difference < GPS noise (3m).
+    const double clat = cos(_lastDiverLatitude * DEG_TO_RAD);
+    double shortestD2 = 1e10;
+    for (int i=0; i<_exitWaypointCount; i++)
     {
-      shortestDistance =  distance;
-      closestExitWaypointIndex = i;
+      const double dlat = WraysburyWaypoints::waypoints[_exitWaypointIndices[i]]._lat - _lastDiverLatitude;
+      const double dlon = (WraysburyWaypoints::waypoints[_exitWaypointIndices[i]]._long - _lastDiverLongitude) * clat;
+      const double d2 = dlat*dlat + dlon*dlon;
+      if (d2 < shortestD2) { shortestD2 = d2; closestExitWaypointIndex = i; }
+    }
+  }
+  else
+  {
+    shortestDistance = 1e10;
+    for (int i=0; i<_exitWaypointCount; i++)
+    {
+      const double distance = distanceBetween(_lastDiverLatitude, _lastDiverLongitude, WraysburyWaypoints::waypoints[_exitWaypointIndices[i]]._lat, WraysburyWaypoints::waypoints[_exitWaypointIndices[i]]._long);
+      if (distance < shortestDistance) { shortestDistance = distance; closestExitWaypointIndex = i; }
     }
   }
 
-  //sprintf(_debugString,"closestjetty index = %i\njetty count=%i\njettywaypoint=%i", closestExitWaypointIndex,_exitWaypointCount,_exitWaypointIndices[closestExitWaypointIndex]); fillScreen(TFT_BROWN); delay(1000);
-      
+  // Always compute actual metres for the winner — used by the UI
+  shortestDistance = distanceBetween(_lastDiverLatitude, _lastDiverLongitude,
+    WraysburyWaypoints::waypoints[_exitWaypointIndices[closestExitWaypointIndex]]._lat,
+    WraysburyWaypoints::waypoints[_exitWaypointIndices[closestExitWaypointIndex]]._long);
+
   return _exitWaypointIndices[closestExitWaypointIndex];
 }
 
-int MapScreen_ex::getClosestFeatureIndex(double& shortestDistance)
+int MapScreen_ex::getClosestFeatureIndex(double& shortestDistance, bool useFastApprox)
 {
-  shortestDistance = 1e99;
-  int closestFeatureIndex = 255;
+  int closestFeatureIndex = _firstWaypointIndex;
 
-  for (int i=_firstWaypointIndex; i < _endWaypointsIndex; i++)
+  if (useFastApprox)
   {
-    double distance = distanceBetween(_lastDiverLatitude, _lastDiverLongitude, WraysburyWaypoints::waypoints[i]._lat, WraysburyWaypoints::waypoints[i]._long);
-  
-    if (distance < shortestDistance)
+    // Equirectangular squared distance — one cos() then pure arithmetic per waypoint.
+    const double clat = cos(_lastDiverLatitude * DEG_TO_RAD);
+    double shortestD2 = 1e99;
+    for (int i=_firstWaypointIndex; i < _endWaypointsIndex; i++)
     {
-      shortestDistance =  distance;
-      closestFeatureIndex = i;
+      const double dlat = WraysburyWaypoints::waypoints[i]._lat - _lastDiverLatitude;
+      const double dlon = (WraysburyWaypoints::waypoints[i]._long - _lastDiverLongitude) * clat;
+      const double d2 = dlat*dlat + dlon*dlon;
+      if (d2 < shortestD2) { shortestD2 = d2; closestFeatureIndex = i; }
     }
   }
-      
+  else
+  {
+    shortestDistance = 1e99;
+    for (int i=_firstWaypointIndex; i < _endWaypointsIndex; i++)
+    {
+      const double distance = distanceBetween(_lastDiverLatitude, _lastDiverLongitude, WraysburyWaypoints::waypoints[i]._lat, WraysburyWaypoints::waypoints[i]._long);
+      if (distance < shortestDistance) { shortestDistance = distance; closestFeatureIndex = i; }
+    }
+  }
+
+  // Always compute actual metres for the winner — used by the UI
+  shortestDistance = distanceBetween(_lastDiverLatitude, _lastDiverLongitude,
+    WraysburyWaypoints::waypoints[closestFeatureIndex]._lat,
+    WraysburyWaypoints::waypoints[closestFeatureIndex]._long);
+
   return closestFeatureIndex;
 }
 
@@ -642,15 +672,15 @@ void MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLat
   drawHeadingLineOnCompositeMapSprite(diverLatitude, diverLongitude, diverHeading, *nextMap);
   const uint32_t t7 = micros();
 
-  _nearestExitBearing = drawDirectionalLineOnCompositeSprite(diverLatitude, diverLongitude, *nextMap,getClosestJettyIndex(_distanceToNearestExit), _mapAttr.nearestExitLineColour, _mapAttr.nearestExitLinePixelLength);
+  _nearestExitBearing = drawDirectionalLineOnCompositeSprite(diverLatitude, diverLongitude, *nextMap,getClosestJettyIndex(_distanceToNearestExit, true), _mapAttr.nearestExitLineColour, _mapAttr.nearestExitLinePixelLength);
   const uint32_t t8 = micros();
 
   _targetBearing = drawDirectionalLineOnCompositeSprite(diverLatitude, diverLongitude, *nextMap,_targetWaypointIndex, _mapAttr.targetLineColour, _mapAttr.targetLinePixelLength);
   const uint32_t t9 = micros();
 
   _targetDistance = distanceBetween(diverLatitude, diverLongitude, WraysburyWaypoints::waypoints[_targetWaypointIndex]._lat, WraysburyWaypoints::waypoints[_targetWaypointIndex]._long);
-  _nearestFeatureIndex = getClosestFeatureIndex(_nearestFeatureDistance);
-  _nearestFeatureDistance = distanceBetween(diverLatitude, diverLongitude, WraysburyWaypoints::waypoints[_nearestFeatureIndex]._lat, WraysburyWaypoints::waypoints[_nearestFeatureIndex]._long);
+  _nearestFeatureIndex = getClosestFeatureIndex(_nearestFeatureDistance, true);
+  // _nearestFeatureDistance is set by getClosestFeatureIndex — no second distanceBetween call needed
   _nearestFeatureBearing = degreesCourseTo(diverLatitude, diverLongitude, WraysburyWaypoints::waypoints[_nearestFeatureIndex]._lat, WraysburyWaypoints::waypoints[_nearestFeatureIndex]._long);
   const uint32_t t10 = micros();
 

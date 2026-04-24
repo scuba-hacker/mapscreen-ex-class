@@ -23,6 +23,7 @@ PNG png;
 static fs::File pngFile;
 static TFT_eSprite* pngTargetSprite = nullptr;
 static std::vector<uint16_t> pngPixelBuffer;  // Static buffer for PNG decoding (screen-sized, reused for each decode)
+static std::string lastLoadedPngFilename;      // Tracks which PNG is currently decoded in pngPixelBuffer
 
 static void * pngOpenLFS(const char *filename, int32_t *size) {
   pngFile = LittleFS.open(filename, FILE_READ);
@@ -409,17 +410,25 @@ void MapScreen_ex::drawPNG(const char* filename, bool swapBytes)
   if (!filename || !useBaseMapCache() || pngPixelBuffer.empty()) {
       return;
   }
-  
-  if (!LittleFS.exists(filename)) {
-      USB_SERIAL.printf("PNG file not found: %s\n", filename);
+
+  // Skip decode if this PNG is already in the buffer — zoom/tile changes reuse the existing decode
+  if (lastLoadedPngFilename == filename) {
+      USB_SERIAL.printf("  → PNG cache hit, reusing buffer: %s\n", filename);
       return;
   }
-  
+
+  if (!LittleFS.exists(filename)) {
+      USB_SERIAL.printf("PNG file not found: %s\n", filename);
+      lastLoadedPngFilename.clear();
+      return;
+  }
+
   int16_t rc = png.open(filename, pngOpenLFS, pngClose, pngRead, pngSeek, pngDrawToSprite);
 
   if (rc != PNG_SUCCESS) {
       USB_SERIAL.printf("png.open() failed: %d\n", rc);
       std::fill(pngPixelBuffer.begin(), pngPixelBuffer.end(), PURPLE);  // Purple on open error
+      lastLoadedPngFilename.clear();
       return;
   }
 
@@ -429,10 +438,12 @@ void MapScreen_ex::drawPNG(const char* filename, bool swapBytes)
       USB_SERIAL.printf("png.decode() failed: %d\n", rc);
       png.close();
       std::fill(pngPixelBuffer.begin(), pngPixelBuffer.end(), PINK);  // Pink on decode error
+      lastLoadedPngFilename.clear();
       return;
   }
 
   png.close();
+  lastLoadedPngFilename = filename;
 }
 
 void MapScreen_ex::testDrawPNG(const char* filename, bool swapBytes)

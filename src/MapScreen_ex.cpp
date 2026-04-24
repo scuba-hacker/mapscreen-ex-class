@@ -81,6 +81,7 @@ MapScreen_ex::MapScreen_ex(TFT_eSPI& tft, const MapScreenAttr mapAttributes) :
                                                         _useDiverHeading(true),
                                                         _targetWaypointIndex(0),
                                                         _prevWaypointIndex(0),
+                                                        _nearestFeatureIndex(0),
                                                         _drawAllFeatures(true),
                                                         _tft(tft),
                                                         _mapAttr(mapAttributes),
@@ -656,6 +657,12 @@ void MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLat
   }
 
   const uint32_t t2 = micros();
+
+  if (useBaseMapCache())
+  {
+      _baseMapCacheSprite->pushToSprite(*_compositedScreenSprite, 0, 0);
+  }
+  // else: _baseMap IS _compositedScreenSprite already — no copy needed
 
   _baseMapCacheSprite->pushToSprite(*_compositedScreenSprite,0,0);
   const uint32_t t3 = micros();

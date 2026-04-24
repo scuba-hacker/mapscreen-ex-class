@@ -82,7 +82,7 @@ class MapScreen_ex
 
         bool useSpriteForFeatures;
 
-        bool traceColour;
+        uint16_t traceColour;
         int tracePointSize;
     };
 

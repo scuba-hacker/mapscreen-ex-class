@@ -194,7 +194,7 @@ class MapScreen_ex
   
     virtual void initMapScreen();
 
-    virtual void initFirstAndEndWaypointsIndices();
+    virtual void initFirstAndEndWaypointsIndices() = 0;
 
     Print* LOG_HOOK;
 

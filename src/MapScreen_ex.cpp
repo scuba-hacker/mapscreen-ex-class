@@ -131,12 +131,13 @@ void MapScreen_ex::initFeatureColours()
   waypointColourLookup[UNKNOWN] = TFT_BROWN;
 }
 
-
+/*
 void MapScreen_ex::initFirstAndEndWaypointsIndices()
 {
   _firstWaypointIndex = WraysburyWaypoints::getStartIndexWraysbury();  // default for wraysbury
   _endWaypointsIndex = WraysburyWaypoints::getEndWaypointIndexWraysbury();
 }
+*/
 
 void MapScreen_ex::displayMapLegend()
 {
@@ -186,43 +187,54 @@ void MapScreen_ex::initSprites()
     pngPixelBuffer.resize(getTFTWidth() * getTFTHeight());
   }
 
+  void* created = nullptr;
+
   _compositedScreenSprite->setColorDepth(16);
-  _compositedScreenSprite->createSprite(getTFTWidth(),getTFTHeight());
+  created = _compositedScreenSprite->createSprite(getTFTWidth(),getTFTHeight());
+  USB_SERIAL.printf("_compositedScreenSprite %s\n",(created ? "created" : "FAILED creation"));
 
   _diverSprite->setColorDepth(16);
-  _diverSprite->createSprite(_mapAttr.diverSpriteRadius*2,_mapAttr.diverSpriteRadius*2);
+  created = _diverSprite->createSprite(_mapAttr.diverSpriteRadius*2,_mapAttr.diverSpriteRadius*2);
+  USB_SERIAL.printf("_diverSprite %s\n",(created ? "created" : "FAILED creation"));
   _diverSprite->fillCircle(_mapAttr.diverSpriteRadius,_mapAttr.diverSpriteRadius,_mapAttr.diverSpriteRadius,_mapAttr.diverSpriteColour);
   
   _diverPlainSprite->setColorDepth(16);
-  _diverPlainSprite->createSprite(_mapAttr.diverSpriteRadius*2,_mapAttr.diverSpriteRadius*2);
+  created = _diverPlainSprite->createSprite(_mapAttr.diverSpriteRadius*2,_mapAttr.diverSpriteRadius*2);
+  USB_SERIAL.printf("_diverPlainSprite %s\n",(created ? "created" : "FAILED creation"));
   _diverSprite->pushToSprite(*_diverPlainSprite,0,0);
-
   _diverSprite->fillCircle(_mapAttr.headingIndicatorOffsetX,_mapAttr.headingIndicatorOffsetY,_mapAttr.headingIndicatorRadius,_mapAttr.headingIndicatorColour);
 
   _diverRotatedSprite->setColorDepth(16);
-  _diverRotatedSprite->createSprite(_mapAttr.diverSpriteRadius*2,_mapAttr.diverSpriteRadius*2);  
+  created = _diverRotatedSprite->createSprite(_mapAttr.diverSpriteRadius*2,_mapAttr.diverSpriteRadius*2);  
+  USB_SERIAL.printf("_diverRotatedSprite %s\n",(created ? "created" : "FAILED creation"));
   
   _featureSprite->setColorDepth(16);
-  _featureSprite->createSprite(_mapAttr.featureSpriteRadius*2+1,_mapAttr.featureSpriteRadius*2+1);
+  created = _featureSprite->createSprite(_mapAttr.featureSpriteRadius*2+1,_mapAttr.featureSpriteRadius*2+1);
   _featureSprite->fillCircle(_mapAttr.featureSpriteRadius,_mapAttr.featureSpriteRadius,_mapAttr.featureSpriteRadius,_mapAttr.featureSpriteColour);
+  USB_SERIAL.printf("_featureSprite %s\n",(created ? "created" : "FAILED creation"));
 
   _targetSprite->setColorDepth(16);
-  _targetSprite->createSprite(_mapAttr.featureSpriteRadius*2+1,_mapAttr.featureSpriteRadius*2+1);
+  created = _targetSprite->createSprite(_mapAttr.featureSpriteRadius*2+1,_mapAttr.featureSpriteRadius*2+1);
   _targetSprite->fillCircle(_mapAttr.featureSpriteRadius,_mapAttr.featureSpriteRadius,_mapAttr.featureSpriteRadius,_mapAttr.targetSpriteColour);
+  USB_SERIAL.printf("_targetSprite %s\n",(created ? "created" : "FAILED creation"));
 
   _lastTargetSprite->setColorDepth(16);
-  _lastTargetSprite->createSprite(_mapAttr.featureSpriteRadius*2+1,_mapAttr.featureSpriteRadius*2+1);
+  created = _lastTargetSprite->createSprite(_mapAttr.featureSpriteRadius*2+1,_mapAttr.featureSpriteRadius*2+1);
   _lastTargetSprite->fillCircle(_mapAttr.featureSpriteRadius,_mapAttr.featureSpriteRadius,_mapAttr.featureSpriteRadius,_mapAttr.lastTargetSpriteColour);
+  USB_SERIAL.printf("_lastTargetSprite %s\n",(created ? "created" : "FAILED creation"));
 
   _breadCrumbSprite->setColorDepth(16);
-  _breadCrumbSprite->createSprite(_mapAttr.breadCrumbWidth, _mapAttr.breadCrumbWidth);
+  created = _breadCrumbSprite->createSprite(_mapAttr.breadCrumbWidth, _mapAttr.breadCrumbWidth);
   _breadCrumbSprite->fillTriangle((_mapAttr.breadCrumbWidth - 1) / 2 + 1,0,6,_mapAttr.breadCrumbWidth,15,_mapAttr.breadCrumbWidth,_mapAttr.breadCrumbColour);
+  USB_SERIAL.printf("_breadCrumbSprite %s\n",(created ? "created" : "FAILED creation"));
 
   _rotatedBreadCrumbSprite->setColorDepth(16);
-  _rotatedBreadCrumbSprite->createSprite(_mapAttr.breadCrumbWidth,_mapAttr.breadCrumbWidth);
+  created = _rotatedBreadCrumbSprite->createSprite(_mapAttr.breadCrumbWidth,_mapAttr.breadCrumbWidth);
+  USB_SERIAL.printf("_rotatedBreadCrumbSprite %s\n",(created ? "created" : "FAILED creation"));
 
   _pinSprite->setColorDepth(16);
-  _pinSprite->createSprite(_mapAttr.pinWidth,_mapAttr.pinWidth);  
+  created = _pinSprite->createSprite(_mapAttr.pinWidth,_mapAttr.pinWidth);  
+  USB_SERIAL.printf("_pinSprite %s\n",(created ? "created" : "FAILED creation"));
   _pinSprite->fillRoundRect(0,0,_mapAttr.pinWidth, _mapAttr.pinWidth, 5, _mapAttr.pinBackColour);
   _pinSprite->fillCircle(_mapAttr.pinWidth/2,_mapAttr.pinWidth/2,_mapAttr.pinWidth/3, _mapAttr.pinForeColour);
 }
@@ -230,7 +242,7 @@ void MapScreen_ex::initSprites()
 void MapScreen_ex::initExitWaypoints()
 {
   int currentExitIndex=-1;
-  
+  USB_SERIAL.println("initExitWayPoints");
   for (int i=_firstWaypointIndex; i<_endWaypointsIndex; i++)
   {
     // starting at the first waypoint for the map, find the first waypoint with code prefix Z0
@@ -238,6 +250,7 @@ void MapScreen_ex::initExitWaypoints()
     // this prefix are before the end of the waypoints list (for this location).
     if (strncmp(WraysburyWaypoints::waypoints[i]._label, "Z0", 2) == 0)
     {
+      USB_SERIAL.println("Found ExitWayPoint...");
       _exitWaypointIndices[++currentExitIndex] = i;
       if (currentExitIndex == s_exitWaypointSize - 1)
       {
@@ -246,6 +259,7 @@ void MapScreen_ex::initExitWaypoints()
       }
     }
   }
+  USB_SERIAL.println("finished initExitWayPoints");
 
   _exitWaypointCount = currentExitIndex+1;
 }
@@ -664,7 +678,6 @@ void MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLat
   }
   // else: _baseMap IS _compositedScreenSprite already — no copy needed
 
-  _baseMapCacheSprite->pushToSprite(*_compositedScreenSprite,0,0);
   const uint32_t t3 = micros();
 
   drawTracesOnCompositeMapSprite(diverLatitude, diverLongitude, *nextMap);

@@ -248,6 +248,7 @@ class MapScreen_ex
     void drawPNG(const char* filename, bool swapBytes);
     void testDrawPNG(const char* filename, bool swapBytes);
 
+    
     int drawDirectionalLineOnCompositeSprite(const double diverLatitude, const double diverLongitude, 
                                                     const geo_map& featureMap, const int waypointIndex, uint16_t colour, int indicatorLength);
 
@@ -310,6 +311,36 @@ class MapScreen_ex
     virtual void setLocationLatLong()
     {
       _location = e_wraysbury_location;
+    }
+
+    float getTargetBearing() const
+    {
+      return _targetBearing;
+    }
+
+    float getTargetDistance() const
+    {
+      return _targetDistance;
+    }
+
+    float getNearestExitBearing() const
+    {
+      return _nearestExitBearing;
+    }
+
+    float getNearestExitDistance() const
+    {
+      return _distanceToNearestExit;
+    }
+
+    float getNearestFeatureBearing() const
+    {
+      return _nearestFeatureBearing;
+    }
+
+    float getNearestFeatureDistance() const
+    {
+      return _nearestFeatureDistance;
     }
 
   protected:

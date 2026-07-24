@@ -689,11 +689,11 @@ void MapScreen_ex::drawDiverOnBestFeaturesMapAtCurrentZoom(const double diverLat
   drawPlacedPins(diverLatitude, diverLongitude, *nextMap);
   const uint32_t t6 = micros();
 
-  drawHeadingLineOnCompositeMapSprite(diverLatitude, diverLongitude, diverHeading, *nextMap);
-  const uint32_t t7 = micros();
-
   _targetBearing = drawDirectionalLineOnCompositeSprite(diverLatitude, diverLongitude, *nextMap,_targetWaypointIndex, _mapAttr.targetLineColour, _mapAttr.targetLinePixelLength);
   const uint32_t t9 = micros();
+
+  drawHeadingLineOnCompositeMapSprite(diverLatitude, diverLongitude, diverHeading, *nextMap);
+  const uint32_t t7 = micros();
 
   _nearestExitBearing = drawDirectionalLineOnCompositeSprite(diverLatitude, diverLongitude, *nextMap,getClosestJettyIndex(_distanceToNearestExit, true), _mapAttr.nearestExitLineColour, _mapAttr.nearestExitLinePixelLength);
   const uint32_t t8 = micros();

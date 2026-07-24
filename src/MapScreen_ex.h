@@ -99,13 +99,22 @@ class MapScreen_ex
         const float mapLongitudeLeft;
         const float mapLongitudeRight;
         const float mapLatitudeBottom;
+        const float mapLatitudeTop;
       
+        // includes png, no latitude top
         geo_map(const uint16_t * md, const char* p, const char* l, uint16_t bc,const char* bt, bool sm, bool sb, float ll, float lr, float lb) : 
           mapData(md), png(p), label(l), backColour(bc), backText(bt), surveyMap(sm), swapBytes(sb), 
-          mapLongitudeLeft(ll), mapLongitudeRight(lr), mapLatitudeBottom(lb)
+          mapLongitudeLeft(ll), mapLongitudeRight(lr), mapLatitudeBottom(lb),mapLatitudeTop(0.0)
         {}
 
-        geo_map(const uint16_t * md, const char* l, uint16_t bc,const char* bt, bool sm, bool sb, float ll, float lr, float lb) : mapData(md),png(nullptr), label(l),backColour(bc),backText(bt),surveyMap(sm),swapBytes(sb),mapLongitudeLeft(ll),mapLongitudeRight(lr),mapLatitudeBottom(lb)
+        // includes png and latitude top
+        geo_map(const uint16_t * md, const char* p, const char* l, uint16_t bc,const char* bt, bool sm, bool sb, float ll, float lr, float lb, float lt) : 
+          mapData(md), png(p), label(l), backColour(bc), backText(bt), surveyMap(sm), swapBytes(sb), 
+          mapLongitudeLeft(ll), mapLongitudeRight(lr), mapLatitudeBottom(lb),mapLatitudeTop(lt)
+        {}
+
+        // no png, no latitude top
+        geo_map(const uint16_t * md, const char* l, uint16_t bc,const char* bt, bool sm, bool sb, float ll, float lr, float lb) : mapData(md),png(nullptr), label(l),backColour(bc),backText(bt),surveyMap(sm),swapBytes(sb),mapLongitudeLeft(ll),mapLongitudeRight(lr),mapLatitudeBottom(lb),mapLatitudeTop(0.0)
         {}
     };
 
@@ -165,7 +174,7 @@ class MapScreen_ex
         int _firstWaypointIndex = 0;
         int _endWaypointsIndex = 0;
 
-        enum locations { e_wraysbury_location, e_vobster_location, e_home_location, e_other_location, e_uninitialised_location};
+        enum locations { e_wraysbury_location, e_vobster_location, e_tapwood_location, e_home_location, e_other_location, e_uninitialised_location};
         locations _location = e_uninitialised_location;
 
         const char* getLocationName(locations loc)
@@ -175,6 +184,7 @@ class MapScreen_ex
             case e_wraysbury_location: return "Wraysbury";
             case e_vobster_location: return "Vobster";
             case e_home_location: return "Home";
+            case e_tapwood_location: return "Tapwood";
             case e_other_location: return "Other";
             case e_uninitialised_location: return "Uninitialised";
             default: return "Unknown";
